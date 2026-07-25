@@ -1,0 +1,175 @@
+/* ============================================================================
+   Tokyo Shopping Guide — PC 전용 레이아웃
+   ============================================================================
+   css/style.css(모바일 기준 디자인 시스템)를 그대로 불러온 뒤, 이 파일에서
+   레이아웃만 넓은 화면에 맞게 재배치한다. 색상/타이포/컴포넌트 스타일은
+   공유하고, "2단 대시보드" 배치와 마우스 상호작용(hover)만 여기서 추가한다.
+   ============================================================================ */
+
+/* 모바일 버전의 "폰 프레임" 연출을 걷어내고 화면 전체를 사용한다 */
+body.is-desktop {
+  display: block;
+  background: var(--color-bg);
+  padding: 0;
+}
+
+#app.desktop-app {
+  max-width: none;
+  width: 100%;
+  min-height: 100vh;
+  box-shadow: none;
+  border-radius: 0;
+}
+
+/* ---------------------------------------------------------------------
+   헤더 — 넓은 화면에 맞게 여백/타이포 확대, 날짜 필은 스크롤 대신 줄바꿈
+   --------------------------------------------------------------------- */
+.is-desktop .app-header {
+  padding: 22px 40px 18px;
+}
+
+.is-desktop .header-top,
+.is-desktop .date-pills {
+  max-width: 1240px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.is-desktop .app-title {
+  font-size: 27px;
+}
+.is-desktop .app-title .flag {
+  font-size: 24px;
+}
+.is-desktop .hotel-name {
+  font-size: 15px;
+}
+.is-desktop .trip-dates-badge {
+  font-size: 13px;
+  padding: 8px 16px;
+}
+
+.is-desktop .date-pills {
+  flex-wrap: wrap;
+  overflow: visible;
+  margin-top: 16px;
+}
+.is-desktop .date-pill {
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.2s ease, color 0.2s ease;
+}
+.is-desktop .date-pill:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+/* ---------------------------------------------------------------------
+   2단 대시보드 그리드
+   --------------------------------------------------------------------- */
+.desktop-shell {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 28px 40px 0;
+}
+
+.desktop-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.desktop-grid .section {
+  padding: 0;
+}
+
+.desktop-grid .day-banner {
+  margin: 0;
+}
+
+/* ---------------------------------------------------------------------
+   지도 — 화면에서 가장 먼저, 가장 크게 보이는 히어로 영역
+   --------------------------------------------------------------------- */
+.desktop-map-hero .map-container {
+  height: 68vh;
+  min-height: 600px;
+  max-height: 820px;
+}
+
+/* 지도 아래: 왼쪽 이동 순서(고정폭) + 오른쪽 매장 카드(가변폭) */
+.desktop-row-secondary {
+  display: grid;
+  grid-template-columns: minmax(300px, 360px) 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.desktop-secondary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+/* ---------------------------------------------------------------------
+   매장 카드 — 가로 스와이프 대신 그리드로 한눈에
+   --------------------------------------------------------------------- */
+.desktop-row-secondary .cards-scroller {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  gap: 16px;
+  overflow: visible;
+  scroll-snap-type: none;
+  padding: 4px;
+  margin: 0;
+}
+
+.desktop-row-secondary .place-card {
+  flex: unset;
+  scroll-snap-align: unset;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.desktop-row-secondary .place-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg);
+}
+
+/* ---------------------------------------------------------------------
+   버튼 / 체크리스트 — 마우스 hover 피드백 추가
+   --------------------------------------------------------------------- */
+.is-desktop .btn {
+  cursor: pointer;
+  transition: transform 0.12s ease, filter 0.15s ease;
+}
+.is-desktop .btn:hover {
+  filter: brightness(1.06);
+}
+
+.is-desktop .checklist-item:hover {
+  background: var(--color-gray-bg);
+}
+
+.is-desktop .card-next-place:hover .next-name {
+  text-decoration: underline;
+}
+
+.is-desktop .budget-tab {
+  cursor: pointer;
+}
+
+/* ---------------------------------------------------------------------
+   반응형 — 화면이 좁아지면 1단으로 자연스럽게 접힘
+   --------------------------------------------------------------------- */
+@media (max-width: 980px) {
+  .desktop-row-secondary {
+    grid-template-columns: 1fr;
+  }
+  .desktop-secondary-grid {
+    grid-template-columns: 1fr;
+  }
+  .desktop-map-hero .map-container {
+    height: 52vh;
+    min-height: 380px;
+  }
+}

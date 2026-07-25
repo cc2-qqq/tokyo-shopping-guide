@@ -1,0 +1,20 @@
+{
+  "name": "Tokyo Shopping Guide",
+  "short_name": "Tokyo Guide",
+  "description": "도쿄 쇼핑 여행을 위한 개인 가이드 — 지도, 체크리스트, 예산을 한 곳에서",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F7F7F7",
+  "theme_color": "#F7F7F7",
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

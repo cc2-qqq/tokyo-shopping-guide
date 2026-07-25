@@ -1,0 +1,1214 @@
+/* ============================================================================
+   Tokyo Shopping Guide — Design System
+   Apple Maps / iOS 느낌의 미니멀하고 고급스러운 여행 가이드 UI
+   ============================================================================ */
+
+:root {
+  /* Colors */
+  --color-bg: #f7f7f7;
+  --color-card: #ffffff;
+  --color-blue: #007aff;
+  --color-blue-dark: #0062cc;
+  --color-orange: #ff9500;
+  --color-orange-dark: #cc7a00;
+  --color-gray: #8e8e93;
+  --color-gray-light: #c7c7cc;
+  --color-gray-bg: #f2f2f7;
+  --color-text: #1c1c1e;
+  --color-text-secondary: #6b6b70;
+  --color-green: #34c759;
+  --color-red: #ff3b30;
+  --color-divider: rgba(60, 60, 67, 0.12);
+
+  /* Elevation */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.12), 0 4px 10px rgba(0, 0, 0, 0.06);
+
+  /* Radii */
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+  --radius-pill: 999px;
+
+  /* Type */
+  --font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+    "Helvetica Neue", "Pretendard Variable", Pretendard, Arial, sans-serif;
+
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-family);
+  overscroll-behavior-y: none;
+}
+
+body {
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+button {
+  font-family: inherit;
+}
+
+/* ============================================================================
+   App Shell — 모바일 폭으로 고정해서 실제 앱처럼 보이게 (데스크톱에서도 동일)
+   ============================================================================ */
+#app {
+  width: 100%;
+  max-width: 480px;
+  min-height: 100vh;
+  background: var(--color-bg);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 0 60px rgba(0, 0, 0, 0.08);
+}
+
+@media (min-width: 481px) {
+  body {
+    background: linear-gradient(180deg, #eceff3 0%, #dfe3e9 100%);
+    padding: 24px 0;
+  }
+  #app {
+    min-height: calc(100vh - 48px);
+    border-radius: 36px;
+    overflow: hidden;
+  }
+}
+
+/* ============================================================================
+   Header
+   ============================================================================ */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 500;
+  padding: calc(14px + var(--safe-top)) 20px 12px;
+  background: rgba(247, 247, 247, 0.86);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.header-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.app-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.app-title .flag {
+  font-size: 18px;
+}
+
+.hotel-name {
+  margin: 3px 0 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.trip-dates-badge {
+  flex-shrink: 0;
+  background: var(--color-blue);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 122, 255, 0.35);
+}
+
+/* Date pills */
+.date-pills {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+.date-pills::-webkit-scrollbar {
+  display: none;
+}
+
+.date-pill {
+  flex-shrink: 0;
+  border: none;
+  background: var(--color-card);
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 700;
+  padding: 9px 18px;
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.15s ease, background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.date-pill .weekday {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 0.6;
+  margin-bottom: 1px;
+}
+
+.date-pill:active {
+  transform: scale(0.94);
+}
+
+.date-pill.active {
+  background: var(--color-blue);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(0, 122, 255, 0.4);
+}
+
+.date-pill.active .weekday {
+  opacity: 0.85;
+}
+
+/* ============================================================================
+   Main / Sections
+   ============================================================================ */
+.app-main {
+  flex: 1;
+  padding-bottom: 40px;
+}
+
+.day-panel {
+  animation: fadeSlideIn 0.32s ease;
+}
+
+.day-panel.slide-left {
+  animation: slideOutLeft 0.18s ease forwards;
+}
+.day-panel.slide-right {
+  animation: slideOutRight 0.18s ease forwards;
+}
+
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes slideOutLeft {
+  to {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+}
+@keyframes slideOutRight {
+  to {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+}
+
+.section {
+  padding: 20px 20px 0;
+}
+
+/* 항공편/체크인 등 지도에 표시할 수 없는 정보 안내 배너 */
+.day-banner {
+  display: none;
+  margin: 14px 20px 0;
+  padding: 10px 14px;
+  background: rgba(28, 28, 30, 0.06);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+.section-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.legend {
+  display: flex;
+  gap: 12px;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.dot-blue {
+  background: var(--color-blue);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.18);
+}
+.dot-orange {
+  background: var(--color-orange);
+  box-shadow: 0 0 0 3px rgba(255, 149, 0, 0.18);
+}
+.dot-red {
+  background: var(--color-red);
+  box-shadow: 0 0 0 3px rgba(255, 59, 48, 0.18);
+}
+
+/* ============================================================================
+   Map
+   ============================================================================ */
+.map-container {
+  width: 100%;
+  height: 62vh;
+  min-height: 420px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+  background: #e5e3df;
+}
+
+.map-hint {
+  text-align: center;
+  font-size: 12px;
+  color: var(--color-gray);
+  margin: 8px 0 0;
+}
+
+/* Leaflet divIcon은 iconSize:[0,0] + iconAnchor:[0,0]로 만들고,
+   실제 라벨은 wrap 안에서 절대좌표로 중앙 정렬해 정확한 위치에 고정한다 */
+.map-label-wrap {
+  position: relative;
+  width: 0;
+  height: 0;
+}
+.route-chip-wrap {
+  position: relative;
+  width: 0;
+  height: 0;
+}
+.route-chip-wrap .route-chip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%);
+}
+
+/* 정확한 좌표를 찍는 고정 핀 — 라벨이 옆으로 밀려도 이 점은 항상 실제 위치에 있는다.
+   안의 숫자는 오늘의 방문 순서(카드 목록 번호와 매칭). */
+.map-pin-dot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--color-blue);
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 800;
+  color: #fff;
+  font-family: var(--font-family);
+  line-height: 1;
+}
+.map-pin-dot.wife {
+  background: var(--color-orange);
+}
+.map-pin-dot.food {
+  background: var(--color-red);
+}
+
+.map-label {
+  position: absolute;
+  left: 0;
+  bottom: 6px;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px 5px 8px;
+  border-radius: var(--radius-pill);
+  background: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text);
+  white-space: nowrap;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.22);
+  border: 1.5px solid transparent;
+  transition: transform 0.15s ease;
+  cursor: pointer;
+}
+
+.map-label::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: #fff;
+}
+
+.map-label .dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+}
+
+/* 주요 역 라벨 — 매장 라벨보다 작고 흐리게, 배경 정보처럼 보이도록 */
+.station-label {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  transform: translate(-50%, 50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(2px);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-gray);
+  white-space: nowrap;
+  border: 1px solid rgba(60, 60, 67, 0.1);
+  pointer-events: none;
+}
+
+.map-label.mine {
+  border-color: rgba(0, 122, 255, 0.5);
+}
+.map-label.wife {
+  border-color: rgba(255, 149, 0, 0.5);
+}
+.map-label.food {
+  border-color: rgba(255, 59, 48, 0.5);
+}
+
+/* 일정에 없는 참고용 매장 — 점선 테두리 + 옅은 배경으로 확정 방문지와 구분 */
+.map-label.extra-shop-label {
+  background: rgba(255, 255, 255, 0.88);
+  border: 1.5px dashed rgba(0, 122, 255, 0.45);
+  color: var(--color-text-secondary);
+  font-weight: 600;
+  font-size: 11px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+.map-label.extra-shop-label::after {
+  border-top-color: rgba(255, 255, 255, 0.88);
+}
+.map-label.done {
+  opacity: 0.5;
+}
+.map-pin-dot.done {
+  opacity: 0.5;
+}
+.map-label.active {
+  transform: translateX(-50%) translateY(-3px) scale(1.06);
+  z-index: 10;
+}
+
+/* 서로 가까운 라벨은 위로 쌓이고, 실제 위치는 점선으로 이어준다 */
+.map-label.stacked::after {
+  display: none;
+}
+.label-leader {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 0;
+  width: 0;
+  border-top: 1.5px dashed rgba(60, 60, 67, 0.45);
+  transform-origin: 0 0;
+}
+
+.map-label-hotel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--color-gray);
+  border: 3px solid #fff;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+  font-size: 16px;
+}
+
+.route-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  background: rgba(28, 28, 30, 0.82);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(4px);
+}
+
+.leaflet-container {
+  font-family: var(--font-family);
+}
+
+/* 내 현재 위치 버튼 */
+.locate-control {
+  margin-bottom: 8px !important;
+}
+.locate-button {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  font-size: 15px;
+  background: #fff;
+  text-decoration: none;
+}
+.locate-button.active {
+  background: var(--color-blue);
+  filter: brightness(1);
+}
+
+/* 실시간 내 위치 표시 — 정확도 원 + 파란 점 + 은은한 펄스 애니메이션 */
+.user-location-wrap {
+  position: relative;
+  width: 0;
+  height: 0;
+}
+.user-location-dot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--color-blue);
+  border: 2.5px solid #fff;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+  z-index: 3;
+}
+.user-location-pulse {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 122, 255, 0.5);
+  animation: userLocationPulse 2s ease-out infinite;
+}
+@keyframes userLocationPulse {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.7;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(4.5);
+    opacity: 0;
+  }
+}
+
+/* ============================================================================
+   Place Cards (carousel)
+   ============================================================================ */
+.cards-scroller {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding: 4px 4px 10px;
+  margin: -4px -4px 0;
+  scrollbar-width: none;
+}
+.cards-scroller::-webkit-scrollbar {
+  display: none;
+}
+
+.place-card {
+  flex: 0 0 84%;
+  scroll-snap-align: start;
+  background: var(--color-card);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: 18px;
+  animation: cardFadeIn 0.35s ease both;
+  border-top: 4px solid var(--color-blue);
+  transition: box-shadow 0.2s ease;
+}
+
+.place-card.wife {
+  border-top-color: var(--color-orange);
+}
+
+.place-card.food {
+  border-top-color: var(--color-red);
+}
+
+.place-card.is-done {
+  opacity: 0.62;
+}
+
+@keyframes cardFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.place-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+/* 지도 핀의 순번과 매칭되는 배지 — "3번 카드 = 지도의 3번 핀" */
+.card-order-badge {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: #fff;
+  background: var(--color-blue);
+  margin-top: 1px;
+}
+.card-order-badge.wife {
+  background: var(--color-orange);
+}
+.card-order-badge.food {
+  background: var(--color-red);
+}
+
+.place-card-title-group {
+  min-width: 0;
+  flex: 1;
+}
+
+.place-card-name {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin: 0 0 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.place-card-name .done-badge {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-green);
+  background: rgba(52, 199, 89, 0.12);
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+}
+
+.place-card-address {
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.place-card-head-right {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.time-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text);
+  background: var(--color-gray-bg);
+  padding: 4px 9px;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+}
+
+.category-chip {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 5px 10px;
+  border-radius: var(--radius-pill);
+  color: #fff;
+  white-space: nowrap;
+}
+.category-chip.mine {
+  background: var(--color-blue);
+}
+.category-chip.wife {
+  background: var(--color-orange);
+}
+.category-chip.food {
+  background: var(--color-red);
+}
+
+.place-card-stars {
+  margin: 10px 0 2px;
+  font-size: 14px;
+  color: var(--color-orange);
+  letter-spacing: 2px;
+}
+.place-card-stars .star-empty {
+  color: var(--color-gray-light);
+}
+
+.place-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+  margin-bottom: 4px;
+}
+.place-card-meta strong {
+  color: var(--color-text);
+  font-weight: 700;
+}
+
+.place-card-note {
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+  background: var(--color-gray-bg);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  margin: 10px 0 4px;
+  line-height: 1.45;
+}
+
+.related-brands {
+  margin: 10px 0 4px;
+  padding: 10px 10px 8px;
+  background: rgba(0, 122, 255, 0.06);
+  border-radius: var(--radius-sm);
+}
+.related-brands-title {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--color-blue-dark);
+  margin: 0 0 6px;
+}
+.related-brands-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.related-brand-tag {
+  font-size: 11.5px;
+  font-weight: 600;
+  background: #fff;
+  color: var(--color-text);
+  padding: 4px 9px;
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-sm);
+}
+
+.place-card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.btn {
+  position: relative;
+  overflow: hidden;
+  border: none;
+  border-radius: 13px;
+  padding: 12px 10px;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  transition: transform 0.12s ease, opacity 0.2s ease;
+  white-space: nowrap;
+}
+.btn:active {
+  transform: scale(0.96);
+}
+
+.btn-primary {
+  background: var(--color-blue);
+  color: #fff;
+  box-shadow: 0 4px 10px rgba(0, 122, 255, 0.3);
+}
+.btn-success {
+  background: var(--color-green);
+  color: #fff;
+  box-shadow: 0 4px 10px rgba(52, 199, 89, 0.3);
+}
+.btn-success.is-checked {
+  background: var(--color-gray-bg);
+  color: var(--color-gray);
+  box-shadow: none;
+}
+.btn-outline {
+  background: var(--color-gray-bg);
+  color: var(--color-text);
+}
+
+.btn[disabled] {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Ripple effect */
+.ripple {
+  position: absolute;
+  border-radius: 50%;
+  transform: scale(0);
+  animation: rippleAnim 0.5s ease-out;
+  background: rgba(255, 255, 255, 0.55);
+  pointer-events: none;
+}
+@keyframes rippleAnim {
+  to {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+
+/* Next place preview — 카드 하단에 자동으로 표시되는 다음 장소 정보 */
+.card-next-place {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--color-divider);
+  font-size: 12.5px;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+}
+.card-next-place .arrow-down {
+  color: var(--color-gray-light);
+  font-weight: 700;
+}
+.card-next-place .transport-badge {
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+}
+.card-next-place .transport-badge.walk {
+  color: var(--color-green);
+  background: rgba(52, 199, 89, 0.1);
+}
+.card-next-place .transport-badge.taxi {
+  color: var(--color-blue);
+  background: rgba(0, 122, 255, 0.1);
+}
+.card-next-place .next-name {
+  font-weight: 800;
+  color: var(--color-text);
+  flex: 1;
+}
+.card-next-place .chevron {
+  color: var(--color-gray-light);
+}
+
+.card-last-note {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--color-divider);
+  font-size: 12px;
+  color: var(--color-gray);
+  text-align: center;
+}
+
+/* ============================================================================
+   Timeline
+   ============================================================================ */
+.timeline {
+  background: var(--color-card);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 18px 18px 6px;
+}
+
+.timeline-item {
+  display: flex;
+  gap: 12px;
+  position: relative;
+}
+
+.timeline-marker-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 14px;
+}
+
+.timeline-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-gray);
+  flex-shrink: 0;
+  box-shadow: 0 0 0 3px var(--color-gray-bg);
+}
+.timeline-dot.mine {
+  background: var(--color-blue);
+}
+.timeline-dot.wife {
+  background: var(--color-orange);
+}
+.timeline-dot.food {
+  background: var(--color-red);
+}
+.timeline-dot.hotel {
+  background: var(--color-text);
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+}
+
+.timeline-line {
+  flex: 1;
+  width: 2px;
+  min-height: 26px;
+  background: var(--color-divider);
+  margin: 2px 0;
+}
+
+.timeline-content {
+  padding-bottom: 22px;
+  flex: 1;
+}
+
+.timeline-time {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-blue);
+}
+
+.timeline-name {
+  font-size: 14.5px;
+  font-weight: 700;
+  margin: -2px 0 2px;
+}
+.timeline-transport {
+  font-size: 11.5px;
+  color: var(--color-text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.timeline-transport .mode-walk {
+  color: var(--color-green);
+  font-weight: 700;
+}
+.timeline-transport .mode-taxi {
+  color: var(--color-blue);
+  font-weight: 700;
+}
+
+/* ============================================================================
+   Checklist
+   ============================================================================ */
+.checklist-progress {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--color-blue);
+  background: rgba(0, 122, 255, 0.1);
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+}
+
+.checklist {
+  background: var(--color-card);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.checklist-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--color-divider);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.checklist-item:last-child {
+  border-bottom: none;
+}
+.checklist-item:active {
+  background: var(--color-gray-bg);
+}
+
+.checkbox {
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  border: 2px solid var(--color-gray-light);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+.checkbox.checked {
+  background: var(--color-blue);
+  border-color: var(--color-blue);
+  transform: scale(1.04);
+}
+.checkbox.checked::after {
+  content: "✓";
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.checklist-item-label {
+  font-size: 14.5px;
+  font-weight: 600;
+  flex: 1;
+}
+.checklist-item.checked .checklist-item-label {
+  color: var(--color-gray);
+  text-decoration: line-through;
+}
+
+.checklist-item-day {
+  font-size: 11px;
+  color: var(--color-gray);
+  font-weight: 600;
+}
+
+/* ============================================================================
+   Budget
+   ============================================================================ */
+.budget-card {
+  background: var(--color-card);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 18px;
+}
+
+.budget-tabs {
+  display: flex;
+  gap: 6px;
+  background: var(--color-gray-bg);
+  border-radius: var(--radius-pill);
+  padding: 4px;
+  margin-bottom: 16px;
+}
+.budget-tab {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 8px 0;
+  border-radius: var(--radius-pill);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+.budget-tab.active {
+  background: #fff;
+  color: var(--color-text);
+  box-shadow: var(--shadow-sm);
+}
+
+.budget-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+}
+.budget-row + .budget-row {
+  border-top: 1px solid var(--color-divider);
+}
+
+.budget-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.budget-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+.budget-icon.shopping {
+  background: rgba(0, 122, 255, 0.12);
+}
+.budget-icon.taxi {
+  background: rgba(255, 149, 0, 0.12);
+}
+.budget-icon.food {
+  background: rgba(52, 199, 89, 0.12);
+}
+
+.budget-value {
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.budget-total-row {
+  margin-top: 6px;
+  padding-top: 14px;
+  border-top: 2px solid var(--color-text);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.budget-total-label {
+  font-size: 15px;
+  font-weight: 800;
+}
+.budget-total-value {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--color-blue);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================================
+   Footer / Toast
+   ============================================================================ */
+.app-footer {
+  text-align: center;
+  padding: 28px 20px calc(20px + var(--safe-bottom));
+}
+.app-footer p {
+  font-size: 12px;
+  color: var(--color-gray);
+  margin: 0;
+}
+
+.version-switch-link {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-blue);
+  text-decoration: none;
+}
+.version-switch-link:active {
+  opacity: 0.6;
+}
+
+.toast {
+  position: fixed;
+  bottom: calc(28px + var(--safe-bottom));
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: rgba(28, 28, 30, 0.92);
+  color: #fff;
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 12px 20px;
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-lg);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  z-index: 2000;
+  white-space: nowrap;
+  backdrop-filter: blur(10px);
+}
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ============================================================================
+   Empty states
+   ============================================================================ */
+.empty-note {
+  font-size: 13px;
+  color: var(--color-gray);
+  text-align: center;
+  padding: 24px 0;
+}

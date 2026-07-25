@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no"
+    />
+    <title>Tokyo Shopping Guide</title>
+    <meta name="description" content="도쿄 쇼핑 & 여행을 위한 개인 가이드" />
+
+    <!-- PWA / iOS 홈 화면 앱처럼 보이기 위한 메타 -->
+    <meta name="theme-color" content="#F7F7F7" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Tokyo Guide" />
+    <link rel="manifest" href="manifest.json" />
+    <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icons/icon.svg" />
+
+    <!-- Leaflet (지도) -->
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <!-- ===================== 상단 헤더 ===================== -->
+      <header class="app-header" id="appHeader">
+        <div class="header-top">
+          <div class="header-title-group">
+            <h1 class="app-title">
+              <span class="flag" aria-hidden="true">🇯🇵</span>
+              <span id="tripTitle">Tokyo Shopping Guide</span>
+            </h1>
+            <p class="hotel-name" id="hotelName"></p>
+          </div>
+          <div class="trip-dates-badge" id="tripDatesBadge"></div>
+        </div>
+
+        <!-- 날짜 선택 필 -->
+        <div class="date-pills" id="datePills" role="tablist" aria-label="여행 날짜 선택"></div>
+      </header>
+
+      <!-- ===================== 메인 콘텐츠 ===================== -->
+      <main class="app-main" id="appMain">
+        <div class="day-panel" id="dayPanel">
+          <!-- 항공편/체크인 등 안내 배너 -->
+          <div class="day-banner" id="dayBanner"></div>
+
+          <!-- 지도 -->
+          <section class="section map-section">
+            <div class="section-header-row">
+              <h2 class="section-title">오늘의 동선</h2>
+              <div class="legend">
+                <span class="legend-item"><i class="dot dot-blue"></i>내 쇼핑</span>
+                <span class="legend-item"><i class="dot dot-orange"></i>와이프 일정</span>
+                <span class="legend-item"><i class="dot dot-red"></i>식당</span>
+              </div>
+            </div>
+            <div id="map" class="map-container"></div>
+            <p class="map-hint">지도 위 라벨을 눌러 매장 정보를 확인하세요</p>
+          </section>
+
+          <!-- 방문 매장 카드 -->
+          <section class="section cards-section">
+            <div class="section-header-row">
+              <h2 class="section-title">방문 매장</h2>
+              <span class="card-counter" id="cardCounter"></span>
+            </div>
+            <div class="cards-scroller" id="cardsScroller"></div>
+          </section>
+
+          <!-- 오늘 이동 순서 타임라인 -->
+          <section class="section timeline-section">
+            <h2 class="section-title">오늘 이동 순서</h2>
+            <div class="timeline" id="timeline"></div>
+          </section>
+
+          <!-- 쇼핑 체크리스트 -->
+          <section class="section checklist-section">
+            <div class="section-header-row">
+              <h2 class="section-title">쇼핑 체크리스트</h2>
+              <span class="checklist-progress" id="checklistProgress"></span>
+            </div>
+            <div class="checklist" id="checklist"></div>
+          </section>
+
+          <!-- 예산 -->
+          <section class="section budget-section">
+            <h2 class="section-title">예산</h2>
+            <div class="budget-card" id="budgetCard"></div>
+          </section>
+        </div>
+
+        <footer class="app-footer">
+          <p>여행 중 이 화면을 구글맵보다 먼저 열어보세요 ✈️</p>
+          <a class="version-switch-link" href="desktop.html">🖥️ PC 버전으로 보기</a>
+        </footer>
+      </main>
+    </div>
+
+    <!-- 토스트 알림 -->
+    <div class="toast" id="toast"></div>
+
+    <!-- Leaflet -->
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+
+    <script src="js/data.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>
