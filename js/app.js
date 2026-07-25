@@ -12,6 +12,7 @@
   const STORAGE_KEYS = {
     checklist: "tokyoGuide.checklist.v1",
     donePlaces: "tokyoGuide.donePlaces.v1",
+    overrides: "tokyoGuide.overrides.v1",
   };
 
   const CATEGORY_LABEL = { mine: "내 쇼핑", wife: "와이프 일정", food: "식당" };
@@ -36,6 +37,10 @@
     routeLayer: null,
     placeMarkers: {}, // { placeId: L.Marker }
     cardObserver: null,
+    // 사용자가 앱에서 직접 뺀/추가한 장소 — 원본 데이터(js/data.js)는 그대로 두고
+    // 이 오버레이만 기기에 저장해서 "동선 재구성" 결과를 유지한다.
+    // { [date]: { placeOrder: [id,...], customPlaces: {id: place}, transportByPlaceId: {id: transport}, fromHotel } }
+    overrides: {},
   };
 
   const dom = {};
@@ -70,6 +75,7 @@
     dom.checklistProgress = document.getElementById("checklistProgress");
     dom.budgetCard = document.getElementById("budgetCard");
     dom.toast = document.getElementById("toast");
+    dom.addPlaceBtn = document.getElementById("addPlaceBtn");
   }
 
   // ---------------------------------------------------------------------
@@ -78,6 +84,7 @@
   function loadStorage() {
     state.checklist = safeParse(localStorage.getItem(STORAGE_KEYS.checklist)) || {};
     state.donePlaces = safeParse(localStorage.getItem(STORAGE_KEYS.donePlaces)) || {};
+    state.overrides = safeParse(localStorage.getItem(STORAGE_KEYS.overrides)) || {};
   }
 
   function safeParse(json) {
@@ -94,6 +101,306 @@
 
   function persistDonePlaces() {
     localStorage.setItem(STORAGE_KEYS.donePlaces, JSON.stringify(state.donePlaces));
+  }
+
+  function persistOverrides() {
+    localStorage.setItem(STORAGE_KEYS.overrides, JSON.stringify(state.overrides));
+  }
+
+  // ---------------------------------------------------------------------
+  // 유효 일정 계산 — 원본 TRIP_DATA + 사용자가 뺀/추가한 장소를 합쳐서
+  // 화면에 실제로 그릴 하루치 데이터를 만든다. TRIP_DATA 자체는 절대 건드리지 않는다.
+  // ---------------------------------------------------------------------
+  function getOverrideForDate(date) {
+    if (!state.overrides[date]) {
+      state.overrides[date] = { placeOrder: null, customPlaces: {}, transportByPlaceId: {}, fromHotel: undefined };
+    }
+    return state.overrides[date];
+  }
+
+  function getEffectiveDay(dayIndex) {
+    const baseDay = TRIP_DATA.days[dayIndex];
+    const override = state.overrides[baseDay.date];
+    if (!override || !override.placeOrder) return baseDay;
+
+    const basePlacesById = {};
+    baseDay.places.forEach((p) => {
+      basePlacesById[p.id] = p;
+    });
+
+    const places = override.placeOrder
+      .map((id) => {
+        const base = basePlacesById[id] || override.customPlaces[id];
+        if (!base) return null;
+        const hasOverride = Object.prototype.hasOwnProperty.call(override.transportByPlaceId || {}, id);
+        const transportToNext = hasOverride ? override.transportByPlaceId[id] : null;
+        return Object.assign({}, base, { transportToNext: transportToNext });
+      })
+      .filter(Boolean);
+
+    return Object.assign({}, baseDay, {
+      places: places,
+      fromHotel: override.fromHotel !== undefined ? override.fromHotel : baseDay.fromHotel,
+    });
+  }
+
+  function getAllEffectiveDays() {
+    return TRIP_DATA.days.map((_, idx) => getEffectiveDay(idx));
+  }
+
+  // 순서가 바뀐 뒤, 숙소→1번째, 1→2번째 ... 구간을 전부 실시간으로 다시 계산해서
+  // override에 저장한다. (구간 수가 많지 않고 캐시도 쓰므로 매번 전체를 다시 구해도 가볍다)
+  function recomputeDayTransport(dayIndex) {
+    const baseDay = TRIP_DATA.days[dayIndex];
+    const override = getOverrideForDate(baseDay.date);
+    const basePlacesById = {};
+    baseDay.places.forEach((p) => {
+      basePlacesById[p.id] = p;
+    });
+
+    const places = override.placeOrder.map((id) => basePlacesById[id] || override.customPlaces[id]).filter(Boolean);
+
+    const seq = [{ id: null, coords: TRIP_DATA.meta.hotelCoords }].concat(
+      places.map((p) => ({ id: p.id, coords: p.coords }))
+    );
+
+    const transportByPlaceId = {};
+    let chain = Promise.resolve();
+
+    for (let i = 0; i < seq.length - 1; i++) {
+      const from = seq[i].coords;
+      const to = seq[i + 1].coords;
+      const fromId = seq[i].id;
+      chain = chain.then(() =>
+        estimateTransport(from, to).then((t) => {
+          if (fromId === null) {
+            override.fromHotel = t;
+          } else {
+            transportByPlaceId[fromId] = t;
+          }
+        })
+      );
+    }
+
+    return chain.then(() => {
+      override.transportByPlaceId = transportByPlaceId;
+    });
+  }
+
+  // 장소 순서를 바꾸는 모든 동작(삭제/추가)의 공통 진입점.
+  // mutateOrderFn: 현재 id 순서 배열을 받아 새 순서 배열을 반환
+  function applyDayOrderChange(dayIndex, mutateOrderFn, newCustomPlace) {
+    const baseDay = TRIP_DATA.days[dayIndex];
+    const currentOrder = getEffectiveDay(dayIndex).places.map((p) => p.id);
+    const newOrder = mutateOrderFn(currentOrder.slice());
+
+    const override = getOverrideForDate(baseDay.date);
+    override.placeOrder = newOrder;
+    if (newCustomPlace) {
+      override.customPlaces[newCustomPlace.id] = newCustomPlace;
+    }
+
+    return recomputeDayTransport(dayIndex).then(() => {
+      persistOverrides();
+      if (state.dayIndex === dayIndex) {
+        rerenderCurrentDay();
+      }
+    });
+  }
+
+  // 카드의 "✕ 제외" 버튼 — 오늘 일정에서 해당 장소를 빼고 남은 지점들로
+  // 동선(도보/택시 시간)을 다시 계산한다. 실수로 뺐을 때를 대비해 토스트에
+  // "실행 취소" 버튼을 붙여 원래 순서 그대로 되돌릴 수 있게 한다.
+  function removePlaceFromDay(dayIndex, placeId) {
+    const place = findPlaceById(placeId);
+    const currentOrder = getEffectiveDay(dayIndex).places.map((p) => p.id);
+    const removedIndex = currentOrder.indexOf(placeId);
+    if (removedIndex === -1) return;
+
+    applyDayOrderChange(dayIndex, (order) => order.filter((id) => id !== placeId));
+    showToast((place ? place.name : "장소") + " 일정에서 제외됨", {
+      label: "실행 취소",
+      onClick: () => {
+        applyDayOrderChange(dayIndex, (order) => {
+          const next = order.slice();
+          next.splice(removedIndex, 0, placeId);
+          return next;
+        });
+      },
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // 구글맵 링크로 장소 추가
+  // 짧은 링크(maps.app.goo.gl)는 서버 없이는 클라이언트에서 안전하게 풀 수
+  // 없어서(공용 CORS 프록시들이 계속 막혀 있음), 위경도가 URL에 그대로 담긴
+  // "전체" 링크(@lat,lng 또는 !3d..!4d..)만 정규식으로 즉시 파싱한다.
+  // ---------------------------------------------------------------------
+  function parseGoogleMapsUrl(rawUrl) {
+    const url = (rawUrl || "").trim();
+    let hostname = "";
+    try {
+      hostname = new URL(url).hostname.toLowerCase();
+    } catch (e) {
+      return { error: "invalid" };
+    }
+    if (hostname.endsWith("goo.gl")) {
+      return { error: "short-link" };
+    }
+
+    const dMatch = url.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);
+    const atMatch = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+    let lat, lng;
+    if (dMatch) {
+      lat = parseFloat(dMatch[1]);
+      lng = parseFloat(dMatch[2]);
+    } else if (atMatch) {
+      lat = parseFloat(atMatch[1]);
+      lng = parseFloat(atMatch[2]);
+    } else {
+      return { error: "not-found" };
+    }
+
+    let name = "";
+    const placeMatch = url.match(/\/place\/([^/@]+)/);
+    if (placeMatch) {
+      name = decodeURIComponent(placeMatch[1].replace(/\+/g, " "));
+    }
+
+    return { lat: lat, lng: lng, name: name };
+  }
+
+  function addPlaceToDay(dayIndex, url, nameInput, categoryKind, insertAfterId) {
+    const parsed = parseGoogleMapsUrl(url);
+    if (parsed.error === "short-link") {
+      showToast("짧은 링크는 인식할 수 없어요. 링크를 한 번 열어서 나온 전체 주소를 붙여넣어 주세요.");
+      return false;
+    }
+    if (parsed.error) {
+      showToast("링크에서 위치를 찾을 수 없어요. 구글맵에서 매장을 연 상태의 링크를 사용해주세요.");
+      return false;
+    }
+
+    const name = (nameInput && nameInput.trim()) || parsed.name || "새로 추가한 장소";
+    const id = "custom-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    const place = {
+      id: id,
+      name: name,
+      address: "직접 추가한 장소",
+      coords: [parsed.lat, parsed.lng],
+      category: categoryKind === "food" ? "mine" : categoryKind,
+      costCategory: categoryKind === "food" ? "food" : undefined,
+      // 이름 검색 대신 좌표 자체로 열어서, 방금 붙여넣은 링크와 항상 정확히 같은 지점이 뜨게 한다
+      googleMapsQuery: parsed.lat + "," + parsed.lng,
+      recommendedDuration: "1시간",
+      rating: 0,
+      isCustom: true,
+    };
+
+    applyDayOrderChange(
+      dayIndex,
+      (order) => {
+        const next = order.slice();
+        if (!insertAfterId) {
+          next.unshift(id);
+        } else {
+          const idx = next.indexOf(insertAfterId);
+          next.splice(idx + 1, 0, id);
+        }
+        return next;
+      },
+      place
+    );
+
+    showToast(name + " 오늘 일정에 추가됨");
+    return true;
+  }
+
+  function buildAddPlaceModal() {
+    const overlay = document.createElement("div");
+    overlay.className = "modal-overlay";
+    overlay.innerHTML =
+      '<div class="modal-sheet">' +
+      '<div class="modal-header"><h3>장소 추가</h3><button type="button" class="modal-close" id="addPlaceClose">✕</button></div>' +
+      '<div class="modal-body">' +
+      '<label class="modal-field"><span class="modal-field-label">구글맵 링크</span>' +
+      '<input type="url" id="addPlaceUrlInput" placeholder="https://www.google.com/maps/place/..." /></label>' +
+      '<p class="modal-hint">전체 주소가 담긴 링크를 붙여넣어 주세요. 짧은 링크(maps.app.goo.gl)는 한 번 열어서 나온 전체 링크를 복사해주세요.</p>' +
+      '<label class="modal-field"><span class="modal-field-label">매장명 (선택)</span>' +
+      '<input type="text" id="addPlaceNameInput" placeholder="비워두면 링크에서 자동으로 가져와요" /></label>' +
+      '<label class="modal-field"><span class="modal-field-label">분류</span>' +
+      '<div class="modal-radio-group">' +
+      '<label><input type="radio" name="addPlaceCategory" value="mine" checked />내 쇼핑</label>' +
+      '<label><input type="radio" name="addPlaceCategory" value="wife" />와이프 일정</label>' +
+      '<label><input type="radio" name="addPlaceCategory" value="food" />식당</label>' +
+      "</div></label>" +
+      '<label class="modal-field"><span class="modal-field-label">추가 위치</span>' +
+      '<select id="addPlaceInsertSelect"></select></label>' +
+      "</div>" +
+      '<div class="modal-actions">' +
+      '<button type="button" class="btn btn-outline" id="addPlaceCancel">취소</button>' +
+      '<button type="button" class="btn btn-primary" id="addPlaceSubmit">추가하기</button>' +
+      "</div></div>";
+    document.body.appendChild(overlay);
+
+    dom.addPlaceOverlay = overlay;
+    dom.addPlaceUrlInput = overlay.querySelector("#addPlaceUrlInput");
+    dom.addPlaceNameInput = overlay.querySelector("#addPlaceNameInput");
+    dom.addPlaceInsertSelect = overlay.querySelector("#addPlaceInsertSelect");
+
+    overlay.querySelector("#addPlaceClose").addEventListener("click", closeAddPlaceModal);
+    overlay.querySelector("#addPlaceCancel").addEventListener("click", closeAddPlaceModal);
+    overlay.querySelector("#addPlaceSubmit").addEventListener("click", submitAddPlaceForm);
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) closeAddPlaceModal();
+    });
+  }
+
+  function openAddPlaceModal() {
+    if (!dom.addPlaceOverlay) buildAddPlaceModal();
+    const overlay = dom.addPlaceOverlay;
+
+    dom.addPlaceUrlInput.value = "";
+    dom.addPlaceNameInput.value = "";
+    overlay.querySelector('input[name="addPlaceCategory"][value="mine"]').checked = true;
+
+    const day = getEffectiveDay(state.dayIndex);
+    const options = ['<option value="">맨 처음에 추가</option>'].concat(
+      day.places.map((p) => '<option value="' + p.id + '">' + escapeHtml(p.name) + " 다음에 추가</option>")
+    );
+    dom.addPlaceInsertSelect.innerHTML = options.join("");
+    if (day.places.length > 0) {
+      dom.addPlaceInsertSelect.value = day.places[day.places.length - 1].id;
+    }
+
+    overlay.classList.add("show");
+  }
+
+  function closeAddPlaceModal() {
+    if (dom.addPlaceOverlay) dom.addPlaceOverlay.classList.remove("show");
+  }
+
+  function submitAddPlaceForm() {
+    const overlay = dom.addPlaceOverlay;
+    const url = dom.addPlaceUrlInput.value.trim();
+    if (!url) {
+      showToast("구글맵 링크를 입력해주세요");
+      return;
+    }
+    const category = overlay.querySelector('input[name="addPlaceCategory"]:checked').value;
+    const insertAfterId = dom.addPlaceInsertSelect.value;
+
+    const ok = addPlaceToDay(state.dayIndex, url, dom.addPlaceNameInput.value, category, insertAfterId);
+    if (ok) closeAddPlaceModal();
+  }
+
+  function rerenderCurrentDay() {
+    const day = getEffectiveDay(state.dayIndex);
+    renderMapForDay(day);
+    renderCards(day);
+    renderTimeline(day);
+    renderBudget();
+    renderChecklist();
   }
 
   // ---------------------------------------------------------------------
@@ -168,7 +475,7 @@
     function renderDayContent() {
       state.dayIndex = idx;
       updateActivePill();
-      const day = TRIP_DATA.days[idx];
+      const day = getEffectiveDay(idx);
       renderBanner(day);
       renderMapForDay(day);
       renderCards(day);
@@ -531,7 +838,7 @@
   // 도보/자동차 경로 좌표를 받아온다. 실패하거나 오프라인이면 직선으로
   // 자연스럽게 대체되므로 지도가 깨지지 않는다.
   // ---------------------------------------------------------------------
-  const ROUTE_GEOMETRY_CACHE = {}; // "mode:lat,lng-lat,lng" -> [[lat,lng], ...] | null
+  const ROUTE_INFO_CACHE = {}; // "mode:lat,lng-lat,lng" -> {coords, duration(초), distance(m)} | null
   let routeFetchQueue = Promise.resolve(); // 데모 서버 권장치(초당 1건)를 넘지 않도록 순차 처리
 
   function fetchWithTimeout(url, ms) {
@@ -550,7 +857,7 @@
     });
   }
 
-  function fetchRouteGeometry(from, to, mode) {
+  function fetchRouteInfo(from, to, mode) {
     const profile = mode === "walk" ? "foot" : "driving";
     const url =
       "https://router.project-osrm.org/route/v1/" +
@@ -572,25 +879,30 @@
       })
       .then((data) => {
         if (data.code !== "Ok" || !data.routes || !data.routes[0]) throw new Error("no route");
-        return data.routes[0].geometry.coordinates.map((c) => [c[1], c[0]]);
+        const route = data.routes[0];
+        return {
+          coords: route.geometry.coordinates.map((c) => [c[1], c[0]]),
+          duration: route.duration, // 초
+          distance: route.distance, // 미터
+        };
       });
   }
 
-  function getRouteGeometryQueued(from, to, mode) {
+  function getRouteInfoQueued(from, to, mode) {
     const key = mode + ":" + from.join(",") + "-" + to.join(",");
-    if (key in ROUTE_GEOMETRY_CACHE) {
-      return Promise.resolve(ROUTE_GEOMETRY_CACHE[key]);
+    if (key in ROUTE_INFO_CACHE) {
+      return Promise.resolve(ROUTE_INFO_CACHE[key]);
     }
     const run = routeFetchQueue.then(
       () =>
         new Promise((resolve) => {
-          fetchRouteGeometry(from, to, mode).then(
-            (coords) => {
-              ROUTE_GEOMETRY_CACHE[key] = coords;
-              resolve(coords);
+          fetchRouteInfo(from, to, mode).then(
+            (info) => {
+              ROUTE_INFO_CACHE[key] = info;
+              resolve(info);
             },
             () => {
-              ROUTE_GEOMETRY_CACHE[key] = null; // 실패도 캐싱해서 같은 구간 재요청 방지
+              ROUTE_INFO_CACHE[key] = null; // 실패도 캐싱해서 같은 구간 재요청 방지
               resolve(null);
             }
           );
@@ -630,12 +942,63 @@
     const chip = L.marker(straightMid, { icon: chipIcon, interactive: false }).addTo(state.routeLayer);
 
     // 실제 도로 경로가 도착하면 직선을 실제 동선으로 교체한다
-    getRouteGeometryQueued(from, to, transport.mode).then((coords) => {
-      if (!coords || coords.length < 2) return; // 실패 시 직선 그대로 유지
+    getRouteInfoQueued(from, to, transport.mode).then((info) => {
+      if (!info || !info.coords || info.coords.length < 2) return; // 실패 시 직선 그대로 유지
       if (!state.map.hasLayer(line)) return; // 그 사이 다른 날짜로 넘어갔으면 무시
-      line.setLatLngs(coords);
-      chip.setLatLng(coords[Math.floor(coords.length / 2)]);
+      line.setLatLngs(info.coords);
+      chip.setLatLng(info.coords[Math.floor(info.coords.length / 2)]);
     });
+  }
+
+  // ---------------------------------------------------------------------
+  // 장소를 빼거나 넣었을 때, 새로 이어지는 두 지점 사이의 이동수단/시간/비용을
+  // 실시간으로 추정한다 — 도보 20분 이내면 도보, 아니면 택시로 판단하고
+  // 택시 요금은 도쿄 기본요금 체계로 근사한다. OSRM이 실패하면 직선거리로 대체.
+  // ---------------------------------------------------------------------
+  function haversineMeters(a, b) {
+    const R = 6371000;
+    const toRad = (d) => (d * Math.PI) / 180;
+    const dLat = toRad(b[0] - a[0]);
+    const dLng = toRad(b[1] - a[1]);
+    const x = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a[0])) * Math.cos(toRad(b[0])) * Math.sin(dLng / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(x));
+  }
+
+  // 2026년 도쿄 소형 택시 기준 근사치 (초기요금 1.052km까지 500엔, 이후 237m당 100엔)
+  function estimateTaxiFare(meters) {
+    if (meters <= 1052) return 500;
+    return 500 + Math.ceil((meters - 1052) / 237) * 100;
+  }
+
+  function estimateTransport(fromCoords, toCoords) {
+    return getRouteInfoQueued(fromCoords, toCoords, "walk")
+      .then((walkInfo) => {
+        if (walkInfo && walkInfo.duration <= 20 * 60) {
+          return { mode: "walk", time: Math.max(1, Math.round(walkInfo.duration / 60)) + "분", cost: 0 };
+        }
+        return getRouteInfoQueued(fromCoords, toCoords, "taxi").then((driveInfo) => {
+          if (driveInfo) {
+            return {
+              mode: "taxi",
+              time: Math.max(3, Math.round(driveInfo.duration / 60)) + "분",
+              cost: estimateTaxiFare(driveInfo.distance),
+            };
+          }
+          return fallbackTransport(fromCoords, toCoords);
+        });
+      })
+      .catch(() => fallbackTransport(fromCoords, toCoords));
+  }
+
+  // OSRM이 아예 응답하지 않을 때(오프라인 등) 직선거리로 대충이라도 추정
+  function fallbackTransport(fromCoords, toCoords) {
+    const straight = haversineMeters(fromCoords, toCoords);
+    if (straight <= 1000) {
+      return { mode: "walk", time: Math.max(1, Math.round(straight / 80)) + "분", cost: 0 };
+    }
+    const roadDistance = straight * 1.3; // 직선 대비 실도로 보정치
+    const minutes = Math.max(3, Math.round(((roadDistance / 1000) * 60) / 25)); // 시속 25km 가정
+    return { mode: "taxi", time: minutes + "분", cost: estimateTaxiFare(roadDistance) };
   }
 
   function addPlaceLabel(place, order) {
@@ -802,6 +1165,9 @@
       CATEGORY_LABEL[colorKind] +
       "</span>" +
       "</div>" +
+      '<button type="button" class="card-remove-btn" data-action="remove-place" data-place-id="' +
+      place.id +
+      '" aria-label="일정에서 제외" title="일정에서 제외">✕</button>' +
       "</div>" +
       '<div class="place-card-stars">' +
       renderStars(place.rating) +
@@ -952,7 +1318,7 @@
   }
 
   function findDayLabelForPlace(placeId) {
-    const day = TRIP_DATA.days.find((d) => d.places.some((p) => p.id === placeId));
+    const day = getAllEffectiveDays().find((d) => d.places.some((p) => p.id === placeId));
     return day ? formatMonthDay(day.date) : "";
   }
 
@@ -979,8 +1345,8 @@
   }
 
   function renderBudget() {
-    const day = TRIP_DATA.days[state.dayIndex];
-    const budget = computeBudget(state.budgetTab === "today" ? [day] : TRIP_DATA.days);
+    const day = getEffectiveDay(state.dayIndex);
+    const budget = computeBudget(state.budgetTab === "today" ? [day] : getAllEffectiveDays());
 
     dom.budgetCard.innerHTML =
       '<div class="budget-tabs">' +
@@ -1020,7 +1386,7 @@
   // Data lookup helpers (전체 TRIP_DATA 기준 — 체크리스트는 날짜 무관하게 전역)
   // ---------------------------------------------------------------------
   function findPlaceById(placeId) {
-    for (const day of TRIP_DATA.days) {
+    for (const day of getAllEffectiveDays()) {
       const p = day.places.find((pl) => pl.id === placeId);
       if (p) return p;
     }
@@ -1029,7 +1395,7 @@
 
   function findPlaceByNameCI(name) {
     const lower = name.toLowerCase();
-    for (const day of TRIP_DATA.days) {
+    for (const day of getAllEffectiveDays()) {
       const p = day.places.find((pl) => pl.name.toLowerCase() === lower);
       if (p) return p;
     }
@@ -1054,7 +1420,7 @@
       showToast(newVal ? place.name + " 체크 완료!" : place.name + " 체크 해제됨");
     }
 
-    renderCards(TRIP_DATA.days[state.dayIndex]);
+    renderCards(getEffectiveDay(state.dayIndex));
     updateMapDoneStates();
     renderChecklist();
   }
@@ -1071,7 +1437,7 @@
     }
 
     renderChecklist();
-    const currentDay = TRIP_DATA.days[state.dayIndex];
+    const currentDay = getEffectiveDay(state.dayIndex);
     if (place && currentDay.places.some((p) => p.id === place.id)) {
       renderCards(currentDay);
     }
@@ -1082,6 +1448,10 @@
   // Global event delegation
   // ---------------------------------------------------------------------
   function bindGlobalEvents() {
+    if (dom.addPlaceBtn) {
+      dom.addPlaceBtn.addEventListener("click", openAddPlaceModal);
+    }
+
     document.addEventListener("click", (e) => {
       const actionBtn = e.target.closest("[data-action]");
       if (actionBtn) {
@@ -1126,8 +1496,13 @@
       return;
     }
 
+    if (action === "remove-place") {
+      removePlaceFromDay(state.dayIndex, btn.dataset.placeId);
+      return;
+    }
+
     if (action === "next-card") {
-      const day = TRIP_DATA.days[state.dayIndex];
+      const day = getEffectiveDay(state.dayIndex);
       const idx = Number(btn.dataset.idx);
       const next = day.places[idx + 1];
       if (next) goToPlace(next.id);
@@ -1151,11 +1526,27 @@
     setTimeout(() => span.remove(), 500);
   }
 
-  function showToast(msg) {
-    dom.toast.textContent = msg;
+  function showToast(msg, action) {
+    dom.toast.innerHTML = "";
+    const msgSpan = document.createElement("span");
+    msgSpan.textContent = msg;
+    dom.toast.appendChild(msgSpan);
+    if (action) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "toast-undo-btn";
+      btn.textContent = action.label;
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        clearTimeout(toastTimer);
+        dom.toast.classList.remove("show");
+        action.onClick();
+      });
+      dom.toast.appendChild(btn);
+    }
     dom.toast.classList.add("show");
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => dom.toast.classList.remove("show"), 1800);
+    toastTimer = setTimeout(() => dom.toast.classList.remove("show"), action ? 4000 : 1800);
   }
 
   function escapeHtml(str) {
