@@ -123,6 +123,8 @@ const TRIP_DATA = {
           googleMapsQuery: "ステーキハウス リベラ 目黒店 東京都目黒区下目黒6-17-20",
           note: "추성훈 단골 스테이크집, 현금 결제만 가능",
           cost: 50000,
+          // 공식 홈페이지가 없어 영업시간 출처마다 정보가 엇갈림(마감시간 17시~24시 등, 정기휴무일도 제각각) — 추측 대신 방문 전 확인 필요
+          hoursNote: "공식 정보 없음, 출처마다 시간이 달라 방문 전 전화 확인 권장",
           transportToNext: null,
         },
       ],
@@ -366,6 +368,8 @@ const TRIP_DATA = {
           googleMapsQuery: "東京ディズニーランド 千葉県浦安市舞浜1-1",
           note: "야간개장, 오후 4시 입장",
           cost: 20000,
+          // 디즈니랜드는 고정 요일 스케줄이 아니라 날짜별 운영시간표(공식 앱/사이트)를 따름
+          hoursNote: "날짜별로 운영시간이 다름, 공식 앱에서 방문일 스케줄 확인 필수",
           transportToNext: null,
         },
       ],
@@ -515,6 +519,8 @@ const TRIP_DATA = {
           googleMapsQuery: "マクセル アクアパーク品川 東京都港区高輪4-10-30",
           note: "돌고래쇼 시간 미리 확인",
           cost: 2500,
+          // 공식 사이트가 8월엔 여름 야간 이벤트 등 날짜별로 다른 시간표를 게시함 — 고정 요일 스케줄로 대표할 수 없음
+          hoursNote: "8월은 날짜별 특별 시간표 운영, 공식 사이트(aqua-park.jp)에서 방문일 확인 필요",
           transportToNext: { mode: "taxi", time: "18분", cost: 2000 },
         },
         {
@@ -555,6 +561,8 @@ const TRIP_DATA = {
           googleMapsQuery: "李朝房 東京都港区高輪1-1-11",
           note: "추성훈 단골 야키니쿠, 곱창전골 유명",
           cost: 16000,
+          // 공식 홈페이지가 없어 영업시간을 공신력 있는 출처로 확인하지 못함
+          hoursNote: "공식 정보 없음, 방문 전 전화 확인 권장",
           transportToNext: null,
         },
       ],
@@ -578,6 +586,8 @@ const TRIP_DATA = {
           googleMapsQuery: "Sanrio SHIBUYA109渋谷店 東京都渋谷区道玄坂2-29-1",
           note: "시부야역 A2 출구 바로 앞",
           cost: 10000,
+          // 산리오 공식 매장 페이지에 "영업시간 변경 중"이라고만 나오고 구체적 시간이 없음
+          hoursNote: "공식 사이트에 구체적 시간 미기재, 방문 전 확인 권장",
           transportToNext: { mode: "walk", time: "5분", cost: 0 },
         },
         {
@@ -837,6 +847,8 @@ const TRIP_DATA = {
           googleMapsQuery: "Brandy Melville Japan 東京都渋谷区神宮前3-29-5",
           note: "일본 1호점",
           cost: 12000,
+          // 공식 사이트의 매장 안내가 JS 렌더링 방식이라 정적으로 시간 정보를 확인하지 못함
+          hoursNote: "공식 사이트에서 매장별 시간 확인 불가, 방문 전 확인 권장",
           transportToNext: { mode: "taxi", time: "20분", cost: 2500 },
         },
         {
@@ -852,6 +864,7 @@ const TRIP_DATA = {
           googleMapsQuery: "ステーキハウス リベラ 目黒店 東京都目黒区下目黒6-17-20",
           note: "8/9에 이어 두 번째 방문, 현금 결제만 가능",
           cost: 50000,
+          hoursNote: "공식 정보 없음, 출처마다 시간이 달라 방문 전 전화 확인 권장",
           transportToNext: null,
         },
       ],

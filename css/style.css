@@ -1636,6 +1636,14 @@ button {
   background: rgba(255, 59, 48, 0.1);
   color: var(--color-red);
 }
+.hours-badge.unconfirmed {
+  display: block;
+  background: rgba(255, 149, 0, 0.14);
+  color: var(--color-orange-dark);
+  white-space: normal;
+  line-height: 1.4;
+  border-radius: var(--radius-sm);
+}
 
 /* ============================================================================
    길찾기 아이콘 버튼 (7번)

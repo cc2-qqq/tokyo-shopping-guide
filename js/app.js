@@ -1374,16 +1374,23 @@
     }
 
     const openStatus = getOpenStatus(place.hours);
-    const hoursHtml = openStatus
-      ? '<div class="hours-badge ' +
+    let hoursHtml = "";
+    if (openStatus) {
+      hoursHtml =
+        '<div class="hours-badge ' +
         (openStatus.open ? "open" : "closed") +
         '">' +
         (openStatus.open ? "🟢" : "🔴") +
         " " +
         escapeHtml(openStatus.label) +
         (openStatus.range ? " · " + escapeHtml(openStatus.range) : "") +
-        "</div>"
-      : "";
+        "</div>";
+    } else if (place.hoursNote) {
+      // 공식 출처로 영업시간을 확인하지 못한 곳 — 추측해서 보여주는 대신
+      // "실시간 연동 안 됨"을 눈에 띄게 표시하고 방문 전 직접 확인하도록 안내한다
+      hoursHtml =
+        '<div class="hours-badge unconfirmed">⚠️ 영업시간 미확인 · ' + escapeHtml(place.hoursNote) + "</div>";
+    }
 
     const lat = place.coords[0];
     const lng = place.coords[1];
