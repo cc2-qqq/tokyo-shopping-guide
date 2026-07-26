@@ -159,6 +159,30 @@ body.is-desktop {
 }
 
 /* ---------------------------------------------------------------------
+   여행 요약 / NOW 카드 / 진행률 — 넓은 화면에서는 가운데 정렬 폭 제한
+   --------------------------------------------------------------------- */
+.is-desktop .trip-summary {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 12px 40px;
+  justify-content: center;
+  overflow-x: visible;
+}
+.is-desktop .trip-summary-item {
+  flex: 0 1 160px;
+}
+
+.is-desktop .card-reorder-btn:hover:not(:disabled),
+.is-desktop .done-group-toggle:hover,
+.is-desktop .card-add-purchase-btn:hover,
+.is-desktop .timeline-toggle:hover {
+  filter: brightness(0.97);
+}
+.is-desktop .now-card-maps-btn:hover {
+  filter: brightness(1.1);
+}
+
+/* ---------------------------------------------------------------------
    반응형 — 화면이 좁아지면 1단으로 자연스럽게 접힘
    --------------------------------------------------------------------- */
 @media (max-width: 980px) {

@@ -40,12 +40,18 @@
         <div class="date-pills" id="datePills" role="tablist" aria-label="여행 날짜 선택"></div>
       </header>
 
+      <!-- 여행 전체 요약 대시보드 -->
+      <div class="trip-summary" id="tripSummary"></div>
+
       <!-- ===================== 메인 콘텐츠 (2단 대시보드 레이아웃) ===================== -->
       <main class="app-main" id="appMain">
         <div class="desktop-shell">
           <div class="day-panel desktop-grid" id="dayPanel">
             <!-- 항공편/체크인 등 안내 배너 -->
             <div class="day-banner" id="dayBanner"></div>
+
+            <!-- 지금 갈 곳(NOW) -->
+            <div class="now-card-wrap" id="nowCardWrap"></div>
 
             <!-- 지도를 가장 먼저, 가장 크게 — 전체 폭을 차지하는 히어로 영역 -->
             <section class="section map-section desktop-map-hero">
@@ -76,7 +82,9 @@
                     <button type="button" class="add-place-trigger" id="addPlaceBtn">+ 장소 추가</button>
                   </div>
                 </div>
+                <div class="day-progress" id="dayProgress"></div>
                 <div class="cards-scroller" id="cardsScroller"></div>
+                <div class="done-group" id="doneGroup"></div>
               </section>
             </div>
 

@@ -1410,3 +1410,460 @@ button {
 .modal-actions .btn {
   flex: 1;
 }
+
+/* ============================================================================
+   여행 요약 대시보드 (12번)
+   ============================================================================ */
+.trip-summary {
+  display: flex;
+  overflow-x: auto;
+  gap: 0;
+  background: var(--color-card);
+  border-bottom: 1px solid var(--color-divider);
+  padding: 10px 16px;
+}
+.trip-summary:empty {
+  display: none;
+}
+.trip-summary-item {
+  flex: 1 0 auto;
+  min-width: 84px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 0 10px;
+  border-right: 1px solid var(--color-divider);
+}
+.trip-summary-item:last-child {
+  border-right: none;
+}
+.trip-summary-value {
+  font-size: 15px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.trip-summary-label {
+  font-size: 10.5px;
+  color: var(--color-text-secondary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ============================================================================
+   NOW 카드 (2번/6번) — 지금 가야 할 곳을 가장 눈에 띄게
+   ============================================================================ */
+.now-card-wrap:empty {
+  display: none;
+}
+.now-card {
+  background: linear-gradient(135deg, var(--color-blue), var(--color-blue-dark));
+  color: #fff;
+  border-radius: var(--radius-lg);
+  padding: 16px 18px;
+  margin-bottom: 14px;
+  box-shadow: var(--shadow-lg);
+}
+.now-card.wife {
+  background: linear-gradient(135deg, var(--color-orange), var(--color-orange-dark));
+}
+.now-card.food {
+  background: linear-gradient(135deg, var(--color-red), #c72a20);
+}
+.now-card.done-all {
+  background: var(--color-gray-bg);
+  color: var(--color-text);
+  text-align: center;
+  font-weight: 700;
+  padding: 16px;
+}
+.now-card-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  opacity: 0.85;
+  margin-bottom: 4px;
+}
+.now-card-name {
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin: 0 0 6px;
+}
+.now-card-meta {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 12.5px;
+  font-weight: 600;
+  opacity: 0.95;
+  flex-wrap: wrap;
+}
+.now-card-maps-btn {
+  width: 100%;
+  margin-top: 12px;
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow: none;
+}
+.now-card-next {
+  margin-top: 8px;
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+/* ============================================================================
+   오늘 진행률 바 + 완료 카드 그룹 (1번/11번)
+   ============================================================================ */
+.day-progress {
+  margin-bottom: 12px;
+}
+.day-progress-label {
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+  margin-bottom: 6px;
+}
+.day-progress-label strong {
+  color: var(--color-text);
+}
+.day-progress-bar {
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-gray-bg);
+  overflow: hidden;
+}
+.day-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-green), #29a648);
+  border-radius: var(--radius-pill);
+  transition: width 0.3s ease;
+}
+
+.done-group {
+  margin-top: 14px;
+}
+.done-group:empty {
+  display: none;
+  margin-top: 0;
+}
+.done-group-toggle {
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: var(--color-gray-bg);
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.done-group-list {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.done-group-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 14px;
+  background: var(--color-card);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+}
+.done-group-name {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  text-decoration: line-through;
+}
+.done-group-undo {
+  border: none;
+  background: none;
+  color: var(--color-blue);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 4px 6px;
+}
+
+/* ============================================================================
+   카드 순서 이동 버튼 (10번)
+   ============================================================================ */
+.card-reorder-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.card-reorder-btn {
+  flex: 1;
+  border: 1px solid var(--color-divider);
+  background: none;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 7px 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.card-reorder-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.card-reorder-btn:active:not(:disabled) {
+  background: var(--color-gray-bg);
+}
+
+/* ============================================================================
+   영업시간 배지 (8번)
+   ============================================================================ */
+.hours-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: var(--radius-pill);
+  margin-top: 8px;
+}
+.hours-badge.open {
+  background: rgba(52, 199, 89, 0.12);
+  color: #248a3d;
+}
+.hours-badge.closed {
+  background: rgba(255, 59, 48, 0.1);
+  color: var(--color-red);
+}
+
+/* ============================================================================
+   길찾기 아이콘 버튼 (7번)
+   ============================================================================ */
+.btn-icon {
+  flex: 0 0 44px;
+  background: var(--color-gray-bg);
+  color: var(--color-text);
+  text-decoration: none;
+  box-shadow: none;
+}
+
+/* ============================================================================
+   개인 메모 (3번)
+   ============================================================================ */
+.card-memo-section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--color-divider);
+}
+.card-section-toggle {
+  border: none;
+  background: none;
+  color: var(--color-text-secondary);
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 0;
+  cursor: pointer;
+  margin-bottom: 6px;
+}
+.card-memo-textarea {
+  width: 100%;
+  min-height: 60px;
+  resize: vertical;
+  font-family: inherit;
+  font-size: 13px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+/* ============================================================================
+   구매 기록 (4번)
+   ============================================================================ */
+.card-purchase-section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--color-divider);
+}
+.card-section-toggle-row {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  margin-bottom: 6px;
+}
+.purchase-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.purchase-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--color-gray-bg);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-size: 12.5px;
+}
+.purchase-item-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 700;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.purchase-item-size {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+.purchase-item-price {
+  flex-shrink: 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.purchase-item-remove {
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  color: var(--color-gray);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 4px;
+}
+.card-add-purchase-btn {
+  border: 1px dashed var(--color-divider);
+  background: none;
+  color: var(--color-blue);
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  width: 100%;
+}
+.purchase-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.purchase-form input {
+  font-family: inherit;
+  font-size: 12.5px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+.purchase-item-input {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+.purchase-size-input,
+.purchase-price-input {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.purchase-submit-btn {
+  flex: 1 1 100%;
+  flex-grow: 0;
+}
+
+/* ============================================================================
+   내 쇼핑 예산 입력 (5번)
+   ============================================================================ */
+.shopping-budget-section {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-divider);
+}
+.shopping-budget-header {
+  font-size: 13.5px;
+  font-weight: 800;
+  margin-bottom: 10px;
+}
+.shopping-budget-input-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.shopping-budget-input-label {
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+  font-weight: 600;
+}
+.shopping-budget-input-field {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  background: var(--color-bg);
+}
+.shopping-budget-input-field input {
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  width: 110px;
+  text-align: right;
+  color: var(--color-text);
+}
+.shopping-budget-input-field input:focus {
+  outline: none;
+}
+.shopping-budget-stats {
+  display: flex;
+  gap: 10px;
+}
+.shopping-budget-stat {
+  flex: 1;
+  background: var(--color-gray-bg);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  text-align: center;
+}
+.shopping-budget-stat-label {
+  display: block;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+.shopping-budget-stat-value {
+  font-size: 15px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.shopping-budget-stat-value.over {
+  color: var(--color-red);
+}
+
+/* ============================================================================
+   타임라인 아코디언 (11번)
+   ============================================================================ */
+.timeline-toggle {
+  width: 100%;
+  margin-top: 8px;
+  border: none;
+  background: var(--color-gray-bg);
+  color: var(--color-text-secondary);
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 9px 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}

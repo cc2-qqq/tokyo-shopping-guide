@@ -13,6 +13,9 @@
     checklist: "tokyoGuide.checklist.v1",
     donePlaces: "tokyoGuide.donePlaces.v1",
     overrides: "tokyoGuide.overrides.v1",
+    memos: "tokyoGuide.memos.v1",
+    purchases: "tokyoGuide.purchases.v1",
+    budgetLimit: "tokyoGuide.budgetLimit.v1",
   };
 
   const CATEGORY_LABEL = { mine: "내 쇼핑", wife: "와이프 일정", food: "식당" };
@@ -41,6 +44,13 @@
     // 이 오버레이만 기기에 저장해서 "동선 재구성" 결과를 유지한다.
     // { [date]: { placeOrder: [id,...], customPlaces: {id: place}, transportByPlaceId: {id: transport}, fromHotel } }
     overrides: {},
+    memos: {}, // { placeId: string }
+    expandedMemos: {}, // { placeId: boolean } — 메모 입력창을 펼쳤는지(화면 상태, 저장 안 함)
+    purchases: {}, // { placeId: [{ id, item, price, size }] }
+    budgetLimit: null, // 사용자가 입력한 총 쇼핑 예산(원 단위 아님, 엔화 숫자)
+    userLocation: null, // [lat, lng] — 위치 추적 중일 때만 채워짐(6번: 가까운 다음 목적지 추천용)
+    timelineExpanded: false,
+    doneGroupExpanded: false,
   };
 
   const dom = {};
@@ -55,6 +65,7 @@
     cacheDom();
     loadStorage();
     renderHeaderStatic();
+    renderTripSummary();
     renderDatePills();
     initMap();
     bindGlobalEvents();
@@ -65,11 +76,15 @@
     dom.tripTitle = document.getElementById("tripTitle");
     dom.hotelName = document.getElementById("hotelName");
     dom.tripDatesBadge = document.getElementById("tripDatesBadge");
+    dom.tripSummary = document.getElementById("tripSummary");
     dom.datePills = document.getElementById("datePills");
     dom.dayPanel = document.getElementById("dayPanel");
     dom.dayBanner = document.getElementById("dayBanner");
+    dom.nowCardWrap = document.getElementById("nowCardWrap");
+    dom.dayProgress = document.getElementById("dayProgress");
     dom.cardsScroller = document.getElementById("cardsScroller");
     dom.cardCounter = document.getElementById("cardCounter");
+    dom.doneGroup = document.getElementById("doneGroup");
     dom.timeline = document.getElementById("timeline");
     dom.checklist = document.getElementById("checklist");
     dom.checklistProgress = document.getElementById("checklistProgress");
@@ -85,6 +100,10 @@
     state.checklist = safeParse(localStorage.getItem(STORAGE_KEYS.checklist)) || {};
     state.donePlaces = safeParse(localStorage.getItem(STORAGE_KEYS.donePlaces)) || {};
     state.overrides = safeParse(localStorage.getItem(STORAGE_KEYS.overrides)) || {};
+    state.memos = safeParse(localStorage.getItem(STORAGE_KEYS.memos)) || {};
+    state.purchases = safeParse(localStorage.getItem(STORAGE_KEYS.purchases)) || {};
+    const savedLimit = safeParse(localStorage.getItem(STORAGE_KEYS.budgetLimit));
+    state.budgetLimit = typeof savedLimit === "number" ? savedLimit : null;
   }
 
   function safeParse(json) {
@@ -101,6 +120,18 @@
 
   function persistDonePlaces() {
     localStorage.setItem(STORAGE_KEYS.donePlaces, JSON.stringify(state.donePlaces));
+  }
+
+  function persistMemos() {
+    localStorage.setItem(STORAGE_KEYS.memos, JSON.stringify(state.memos));
+  }
+
+  function persistPurchases() {
+    localStorage.setItem(STORAGE_KEYS.purchases, JSON.stringify(state.purchases));
+  }
+
+  function persistBudgetLimit() {
+    localStorage.setItem(STORAGE_KEYS.budgetLimit, JSON.stringify(state.budgetLimit));
   }
 
   function persistOverrides() {
@@ -401,6 +432,88 @@
     renderTimeline(day);
     renderBudget();
     renderChecklist();
+    renderNowCard(day);
+    renderTripSummary();
+  }
+
+  // ---------------------------------------------------------------------
+  // "지금 갈 곳" — 오늘 남은 장소 중 어디로 가야 하는지 항상 눈에 띄게 보여준다.
+  // 위치 추적이 켜져 있으면(6번) 가장 가까운 미완료 장소, 꺼져 있으면 원래
+  // 방문 순서상 다음 미완료 장소를 그대로 사용한다.
+  // ---------------------------------------------------------------------
+  function getCurrentTarget(day) {
+    const pending = day.places.filter((p) => !state.donePlaces[p.id]);
+    if (pending.length === 0) return { current: null, next: null };
+
+    let current = pending[0];
+    if (state.userLocation) {
+      let minDist = Infinity;
+      pending.forEach((p) => {
+        const d = haversineMeters(state.userLocation, p.coords);
+        if (d < minDist) {
+          minDist = d;
+          current = p;
+        }
+      });
+    }
+    const next = pending[pending.indexOf(current) + 1] || null;
+    return { current: current, next: next };
+  }
+
+  // 원래 방문 순서에서 이 장소 "바로 앞"의 이동 정보(숙소 출발이면 fromHotel).
+  // 위치 추적이 꺼져 있을 때 "지금 여기까지 얼마나 걸리는지"의 근사치로 쓴다.
+  function getIncomingTransport(day, place) {
+    const idx = day.places.findIndex((p) => p.id === place.id);
+    if (idx <= 0) return day.fromHotel;
+    return day.places[idx - 1].transportToNext;
+  }
+
+  function renderNowCard(day) {
+    if (!dom.nowCardWrap) return;
+    const { current, next } = getCurrentTarget(day);
+
+    if (!current) {
+      dom.nowCardWrap.innerHTML = day.places.length
+        ? '<div class="now-card done-all">🎉 오늘 일정을 모두 완료했습니다!</div>'
+        : "";
+      return;
+    }
+
+    const transport = state.userLocation
+      ? fallbackTransport(state.userLocation, current.coords)
+      : getIncomingTransport(day, current);
+    const transportHtml = transport
+      ? '<span class="now-card-transport">' +
+        (transport.mode === "walk" ? "🚶" : "🚕") +
+        " " +
+        transport.time +
+        (state.userLocation ? " (현재 위치 기준)" : "") +
+        "</span>"
+      : "";
+
+    dom.nowCardWrap.innerHTML =
+      '<div class="now-card ' +
+      getColorKind(current) +
+      '">' +
+      '<div class="now-card-label">NOW · 지금 갈 곳</div>' +
+      '<div class="now-card-body">' +
+      '<p class="now-card-name">' +
+      escapeHtml(formatPlaceName(current)) +
+      "</p>" +
+      '<div class="now-card-meta">' +
+      transportHtml +
+      '<span class="now-card-duration">체류 ' +
+      escapeHtml(current.recommendedDuration) +
+      "</span>" +
+      "</div>" +
+      "</div>" +
+      '<button type="button" class="btn btn-primary now-card-maps-btn" data-action="maps" data-query="' +
+      encodeURIComponent(current.googleMapsQuery || current.name + " " + current.address) +
+      '">📍 Google Maps</button>' +
+      (next
+        ? '<div class="now-card-next">다음: ' + escapeHtml(formatPlaceName(next)) + "</div>"
+        : "") +
+      "</div>";
   }
 
   // ---------------------------------------------------------------------
@@ -474,9 +587,12 @@
 
     function renderDayContent() {
       state.dayIndex = idx;
+      state.doneGroupExpanded = false;
+      state.timelineExpanded = false;
       updateActivePill();
       const day = getEffectiveDay(idx);
       renderBanner(day);
+      renderNowCard(day);
       renderMapForDay(day);
       renderCards(day);
       renderTimeline(day);
@@ -567,8 +683,10 @@
     if (state.watchId != null) {
       navigator.geolocation.clearWatch(state.watchId);
       state.watchId = null;
+      state.userLocation = null;
       state.userLocationLayer.clearLayers();
       button.classList.remove("active");
+      renderNowCard(getEffectiveDay(state.dayIndex));
       return;
     }
 
@@ -605,6 +723,8 @@
   function renderUserLocation(pos) {
     const latlng = [pos.coords.latitude, pos.coords.longitude];
     const accuracy = pos.coords.accuracy || 30;
+    state.userLocation = latlng;
+    renderNowCard(getEffectiveDay(state.dayIndex));
     state.userLocationLayer.clearLayers();
 
     L.circle(latlng, {
@@ -1001,6 +1121,13 @@
     return { mode: "taxi", time: minutes + "분", cost: estimateTaxiFare(roadDistance) };
   }
 
+  // "20분" 같은 표시용 문자열에서 분(숫자)만 뽑아낸다 — 여행 요약의 총 이동시간 합산용
+  function parseMinutes(timeStr) {
+    if (!timeStr) return 0;
+    const m = String(timeStr).match(/\d+/);
+    return m ? parseInt(m[0], 10) : 0;
+  }
+
   function addPlaceLabel(place, order) {
     const isDone = !!state.donePlaces[place.id];
     const colorKind = getColorKind(place);
@@ -1073,6 +1200,8 @@
   function renderCards(day) {
     dom.cardsScroller.innerHTML = "";
     dom.cardCounter.textContent = day.places.length + "곳";
+    renderDayProgress(day);
+    renderDoneGroup(day);
 
     if (day.places.length === 0) {
       dom.cardsScroller.innerHTML = '<p class="empty-note">오늘은 예정된 매장이 없습니다 🧳</p>';
@@ -1080,7 +1209,17 @@
       return;
     }
 
-    day.places.forEach((place, idx) => {
+    const pending = day.places.filter((p) => !state.donePlaces[p.id]);
+    if (pending.length === 0) {
+      dom.cardsScroller.innerHTML = '<p class="empty-note">오늘 일정을 모두 완료했습니다 🎉</p>';
+      if (state.cardObserver) state.cardObserver.disconnect();
+      return;
+    }
+
+    // idx는 항상 day.places(원본 방문 순서) 기준 — "다음 카드" 이동시간 체인이
+    // 이 순서를 기준으로 계산돼 있으므로, 완료 카드를 화면에서 감추더라도 절대 바뀌면 안 된다.
+    pending.forEach((place) => {
+      const idx = day.places.indexOf(place);
       dom.cardsScroller.appendChild(buildPlaceCard(place, day, idx));
     });
 
@@ -1099,6 +1238,101 @@
       { root: dom.cardsScroller, threshold: [0.6] }
     );
     dom.cardsScroller.querySelectorAll(".place-card").forEach((el) => state.cardObserver.observe(el));
+  }
+
+  // ---------------------------------------------------------------------
+  // 오늘 진행률 바 + 완료한 장소 접이식 목록
+  // ---------------------------------------------------------------------
+  function renderDayProgress(day) {
+    if (!dom.dayProgress) return;
+    const total = day.places.length;
+    if (total === 0) {
+      dom.dayProgress.innerHTML = "";
+      return;
+    }
+    const done = day.places.filter((p) => state.donePlaces[p.id]).length;
+    const pct = Math.round((done / total) * 100);
+    dom.dayProgress.innerHTML =
+      '<div class="day-progress-label">오늘 진행률 <strong>' +
+      done +
+      " / " +
+      total +
+      "</strong> 완료</div>" +
+      '<div class="day-progress-bar"><div class="day-progress-fill" style="width:' +
+      pct +
+      '%"></div></div>';
+  }
+
+  function renderDoneGroup(day) {
+    if (!dom.doneGroup) return;
+    const doneItems = day.places.filter((p) => state.donePlaces[p.id]);
+    if (doneItems.length === 0) {
+      dom.doneGroup.innerHTML = "";
+      return;
+    }
+    const expanded = state.doneGroupExpanded;
+    dom.doneGroup.innerHTML =
+      '<button type="button" class="done-group-toggle" data-action="toggle-done-group">' +
+      (expanded ? "▲" : "▼") +
+      " 완료한 장소 (" +
+      doneItems.length +
+      ")</button>" +
+      (expanded
+        ? '<div class="done-group-list">' +
+          doneItems
+            .map(
+              (p) =>
+                '<div class="done-group-row"><span class="done-group-name">✓ ' +
+                escapeHtml(formatPlaceName(p)) +
+                '</span><button type="button" class="done-group-undo" data-action="toggle-done" data-place-id="' +
+                p.id +
+                '">완료 해제</button></div>'
+            )
+            .join("") +
+          "</div>"
+        : "");
+  }
+
+  // 요일별 영업시간(있는 매장만) 기준으로 지금 영업중인지 계산 — 기기 시각을
+  // 그대로 쓰므로, 실제 도쿄 현지에서 사용할 때는 별도 타임존 변환이 필요 없다.
+  function toMinutes(hhmm) {
+    const [h, m] = hhmm.split(":").map(Number);
+    return h * 60 + m;
+  }
+
+  function minutesLabel(mins) {
+    return mins >= 60 ? Math.floor(mins / 60) + "시간" + (mins % 60 ? " " + (mins % 60) + "분" : "") : mins + "분";
+  }
+
+  // 일부 식당은 브레이크타임(예: 15:00~17:00 사이 재료 준비로 휴식)이 있어
+  // open~close 사이라도 실제로는 문을 닫는 시간대가 있다 — 요일별 hours에
+  // breakStart/breakEnd가 있으면 이를 반영한다.
+  function getOpenStatus(hours) {
+    if (!hours) return null;
+    const now = new Date();
+    const today = hours[now.getDay()];
+    const range = today ? today.open + "~" + today.close : "";
+    if (!today) return { open: false, label: "정기휴무", range: "" };
+
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    const openMin = toMinutes(today.open);
+    const closeMin = toMinutes(today.close);
+
+    if (nowMin < openMin) return { open: false, label: today.open + "에 영업 시작", range: range };
+    if (nowMin >= closeMin) return { open: false, label: "영업 종료", range: range };
+
+    if (today.breakStart && today.breakEnd) {
+      const breakStartMin = toMinutes(today.breakStart);
+      const breakEndMin = toMinutes(today.breakEnd);
+      if (nowMin >= breakStartMin && nowMin < breakEndMin) {
+        return { open: false, label: "브레이크타임 · " + today.breakEnd + "에 재개", range: range };
+      }
+      if (nowMin < breakStartMin) {
+        return { open: true, label: "브레이크타임까지 " + minutesLabel(breakStartMin - nowMin), range: range };
+      }
+    }
+
+    return { open: true, label: "마감까지 " + minutesLabel(closeMin - nowMin), range: range };
   }
 
   function buildPlaceCard(place, day, idx) {
@@ -1139,6 +1373,75 @@
       nextHtml = '<div class="card-last-note">오늘의 마지막 장소입니다 🎉</div>';
     }
 
+    const openStatus = getOpenStatus(place.hours);
+    const hoursHtml = openStatus
+      ? '<div class="hours-badge ' +
+        (openStatus.open ? "open" : "closed") +
+        '">' +
+        (openStatus.open ? "🟢" : "🔴") +
+        " " +
+        escapeHtml(openStatus.label) +
+        (openStatus.range ? " · " + escapeHtml(openStatus.range) : "") +
+        "</div>"
+      : "";
+
+    const lat = place.coords[0];
+    const lng = place.coords[1];
+    const memoText = state.memos[place.id] || "";
+    const memoExpanded = Object.prototype.hasOwnProperty.call(state.expandedMemos, place.id)
+      ? state.expandedMemos[place.id]
+      : !!memoText;
+    const memoHtml =
+      '<div class="card-memo-section">' +
+      '<button type="button" class="card-section-toggle" data-action="toggle-memo" data-place-id="' +
+      place.id +
+      '">📝 메모' +
+      (memoText ? "" : " 남기기") +
+      "</button>" +
+      '<textarea class="card-memo-textarea" data-place-id="' +
+      place.id +
+      '" placeholder="예) 셔츠 보기, 팬츠 보기, 재고 확인"' +
+      (memoExpanded ? "" : " hidden") +
+      ">" +
+      escapeHtml(memoText) +
+      "</textarea>" +
+      "</div>";
+
+    const purchases = state.purchases[place.id] || [];
+    const purchaseListHtml = purchases
+      .map(
+        (entry) =>
+          '<div class="purchase-item"><span class="purchase-item-name">' +
+          escapeHtml(entry.item) +
+          (entry.size ? '<span class="purchase-item-size">' + escapeHtml(entry.size) + "</span>" : "") +
+          '</span><span class="purchase-item-price">¥' +
+          (entry.price || 0).toLocaleString() +
+          '</span><button type="button" class="purchase-item-remove" data-action="delete-purchase" data-place-id="' +
+          place.id +
+          '" data-purchase-id="' +
+          entry.id +
+          '" aria-label="구매 기록 삭제">✕</button></div>'
+      )
+      .join("");
+    const purchaseHtml =
+      '<div class="card-purchase-section">' +
+      '<div class="card-section-toggle-row">🛍️ 구매 기록' +
+      (purchases.length ? " (" + purchases.length + ")" : "") +
+      "</div>" +
+      (purchaseListHtml ? '<div class="purchase-list">' + purchaseListHtml + "</div>" : "") +
+      '<button type="button" class="card-add-purchase-btn" data-action="toggle-purchase-form" data-place-id="' +
+      place.id +
+      '">+ 구매 추가</button>' +
+      '<div class="purchase-form" hidden>' +
+      '<input type="text" class="purchase-item-input" placeholder="상품명" />' +
+      '<input type="text" class="purchase-size-input" placeholder="사이즈(선택)" />' +
+      '<input type="number" inputmode="numeric" class="purchase-price-input" placeholder="가격(¥)" />' +
+      '<button type="button" class="btn btn-primary purchase-submit-btn" data-action="add-purchase" data-place-id="' +
+      place.id +
+      '">추가</button>' +
+      "</div>" +
+      "</div>";
+
     card.innerHTML =
       '<div class="place-card-head">' +
       '<span class="card-order-badge ' +
@@ -1169,18 +1472,41 @@
       place.id +
       '" aria-label="일정에서 제외" title="일정에서 제외">✕</button>' +
       "</div>" +
+      '<div class="card-reorder-row">' +
+      '<button type="button" class="card-reorder-btn" data-action="move-place" data-place-id="' +
+      place.id +
+      '" data-direction="prev"' +
+      (idx === 0 ? " disabled" : "") +
+      ' aria-label="순서 앞으로">◀ 순서 변경</button>' +
+      '<button type="button" class="card-reorder-btn" data-action="move-place" data-place-id="' +
+      place.id +
+      '" data-direction="next"' +
+      (idx === day.places.length - 1 ? " disabled" : "") +
+      ' aria-label="순서 뒤로">뒤로 ▶</button>' +
+      "</div>" +
       '<div class="place-card-stars">' +
       renderStars(place.rating) +
       "</div>" +
       '<div class="place-card-meta">추천 체류 <strong>' +
       escapeHtml(place.recommendedDuration) +
       "</strong></div>" +
+      hoursHtml +
       (place.note ? '<p class="place-card-note">' + escapeHtml(place.note) + "</p>" : "") +
       relatedHtml +
       '<div class="place-card-actions">' +
+      '<a class="btn btn-icon" href="https://www.google.com/maps/dir/?api=1&destination=' +
+      lat +
+      "," +
+      lng +
+      '&travelmode=walking" target="_blank" rel="noopener" title="도보 길찾기">🚶</a>' +
+      '<a class="btn btn-icon" href="https://www.google.com/maps/dir/?api=1&destination=' +
+      lat +
+      "," +
+      lng +
+      '&travelmode=driving" target="_blank" rel="noopener" title="택시 길찾기">🚕</a>' +
       '<button type="button" class="btn btn-primary" data-action="maps" data-query="' +
       encodeURIComponent(place.googleMapsQuery || place.name + " " + place.address) +
-      '">📍 Google Maps</button>' +
+      '">📍 Maps</button>' +
       '<button type="button" class="btn btn-success' +
       (isDone ? " is-checked" : "") +
       '" data-action="toggle-done" data-place-id="' +
@@ -1194,7 +1520,20 @@
       (nextPlace ? "" : " disabled") +
       ">다음 ▶</button>" +
       "</div>" +
-      nextHtml;
+      nextHtml +
+      memoHtml +
+      purchaseHtml;
+
+    const memoTextarea = card.querySelector(".card-memo-textarea");
+    memoTextarea.addEventListener("change", () => {
+      const val = memoTextarea.value;
+      if (val.trim()) {
+        state.memos[place.id] = val;
+      } else {
+        delete state.memos[place.id];
+      }
+      persistMemos();
+    });
 
     return card;
   }
@@ -1230,19 +1569,47 @@
   // ---------------------------------------------------------------------
   // Timeline
   // ---------------------------------------------------------------------
+  const TIMELINE_COLLAPSE_THRESHOLD = 4;
+
   function renderTimeline(day) {
-    const items = [{ type: "hotel", name: TRIP_DATA.meta.hotelName, transport: day.fromHotel, time: null }].concat(
+    const items = [{ type: "hotel", id: null, name: TRIP_DATA.meta.hotelName, transport: day.fromHotel, time: null }].concat(
       day.places.map((p) => ({
         type: getColorKind(p),
+        id: p.id,
         name: formatPlaceName(p),
         transport: p.transportToNext,
         time: p.scheduledTime,
       }))
     );
 
-    dom.timeline.innerHTML = items
-      .map((item, idx) => {
-        const isLast = idx === items.length - 1;
+    const canCollapse = day.places.length > TIMELINE_COLLAPSE_THRESHOLD;
+    let visibleItems = items;
+    let hiddenCount = 0;
+    if (canCollapse && !state.timelineExpanded) {
+      const current = getCurrentTarget(day).current;
+      const currentIdx = current ? items.findIndex((it) => it.id === current.id) : 1;
+      const start = Math.max(0, currentIdx - 1);
+      const end = Math.min(items.length, start + 3);
+      visibleItems = items.slice(start, end);
+      hiddenCount = items.length - visibleItems.length;
+    }
+
+    dom.timeline.innerHTML = renderTimelineItems(visibleItems, items) + (canCollapse ? timelineToggleHtml(hiddenCount) : "");
+  }
+
+  function timelineToggleHtml(hiddenCount) {
+    return (
+      '<button type="button" class="timeline-toggle" data-action="toggle-timeline">' +
+      (state.timelineExpanded ? "▲ 접기" : "▼ 전체 일정 보기 (" + hiddenCount + "개 더 보기)") +
+      "</button>"
+    );
+  }
+
+  function renderTimelineItems(visibleItems, allItems) {
+    return visibleItems
+      .map((item) => {
+        const idx = allItems.indexOf(item);
+        const isLast = idx === allItems.length - 1;
         const dotClass = item.type === "hotel" ? "hotel" : item.type;
         const dotContent = item.type === "hotel" ? "🏨" : "";
         let transportHtml = "";
@@ -1344,9 +1711,32 @@
     return { shopping: shopping, taxi: taxi, food: food, total: shopping + taxi + food };
   }
 
+  // 실제 구매기록(4번) 합계 — "예정 지출"(computeBudget, 데이터에 미리 적힌 예상치)과는
+  // 별개로 여행 중 실제로 쓴 돈을 추적한다. 5번/12번이 이 값을 공유해서 쓴다.
+  function computeSpentAmount() {
+    let total = 0;
+    Object.keys(state.purchases).forEach((placeId) => {
+      (state.purchases[placeId] || []).forEach((entry) => {
+        total += entry.price || 0;
+      });
+    });
+    return total;
+  }
+
+  function getShoppingBudgetStatus() {
+    const spent = computeSpentAmount();
+    const limit = state.budgetLimit;
+    return { limit: limit, spent: spent, remaining: limit != null ? limit - spent : null };
+  }
+
+  function formatYen(n) {
+    return (n < 0 ? "-¥" : "¥") + Math.abs(n).toLocaleString();
+  }
+
   function renderBudget() {
     const day = getEffectiveDay(state.dayIndex);
     const budget = computeBudget(state.budgetTab === "today" ? [day] : getAllEffectiveDays());
+    const status = getShoppingBudgetStatus();
 
     dom.budgetCard.innerHTML =
       '<div class="budget-tabs">' +
@@ -1359,13 +1749,43 @@
       (state.budgetTab === "trip" ? " active" : "") +
       '" data-budget-tab="trip">전체 여행</button>' +
       "</div>" +
-      budgetRow("shopping", "🛍️", "쇼핑", budget.shopping) +
-      budgetRow("taxi", "🚕", "택시", budget.taxi) +
-      budgetRow("food", "🍽️", "식비", budget.food) +
-      '<div class="budget-total-row"><span class="budget-total-label">총합</span>' +
+      budgetRow("shopping", "🛍️", "쇼핑 (예정)", budget.shopping) +
+      budgetRow("taxi", "🚕", "택시 (예정)", budget.taxi) +
+      budgetRow("food", "🍽️", "식비 (예정)", budget.food) +
+      '<div class="budget-total-row"><span class="budget-total-label">예정 지출 총합</span>' +
       '<span class="budget-total-value">¥' +
       budget.total.toLocaleString() +
-      "</span></div>";
+      "</span></div>" +
+      '<div class="shopping-budget-section">' +
+      '<div class="shopping-budget-header">💰 내 쇼핑 예산 (실제 구매 기준)</div>' +
+      '<div class="shopping-budget-input-row">' +
+      '<span class="shopping-budget-input-label">총 예산</span>' +
+      '<div class="shopping-budget-input-field"><span>¥</span><input type="number" inputmode="numeric" min="0" id="budgetLimitInput" placeholder="예: 200000" value="' +
+      (status.limit != null ? status.limit : "") +
+      '" /></div>' +
+      "</div>" +
+      '<div class="shopping-budget-stats">' +
+      '<div class="shopping-budget-stat"><span class="shopping-budget-stat-label">사용</span><span class="shopping-budget-stat-value">¥' +
+      status.spent.toLocaleString() +
+      "</span></div>" +
+      '<div class="shopping-budget-stat"><span class="shopping-budget-stat-label">남음</span><span class="shopping-budget-stat-value' +
+      (status.remaining != null && status.remaining < 0 ? " over" : "") +
+      '">' +
+      (status.remaining != null ? formatYen(status.remaining) : "—") +
+      "</span></div>" +
+      "</div>" +
+      "</div>";
+
+    const limitInput = dom.budgetCard.querySelector("#budgetLimitInput");
+    if (limitInput) {
+      limitInput.addEventListener("change", () => {
+        const v = parseInt(limitInput.value, 10);
+        state.budgetLimit = isNaN(v) || v <= 0 ? null : v;
+        persistBudgetLimit();
+        renderBudget();
+        renderTripSummary();
+      });
+    }
   }
 
   function budgetRow(type, icon, label, value) {
@@ -1378,6 +1798,61 @@
       label +
       '</span><span class="budget-value">¥' +
       value.toLocaleString() +
+      "</span></div>"
+    );
+  }
+
+  // ---------------------------------------------------------------------
+  // 여행 요약 대시보드 — 날짜와 무관하게 여행 전체 기준으로 상단에 항상 노출
+  // ---------------------------------------------------------------------
+  function computeTripSummary() {
+    const days = getAllEffectiveDays();
+    let totalPlaces = 0;
+    let doneCount = 0;
+    let totalMinutes = 0;
+
+    days.forEach((day) => {
+      if (day.fromHotel) totalMinutes += parseMinutes(day.fromHotel.time);
+      day.places.forEach((p) => {
+        totalPlaces += 1;
+        if (state.donePlaces[p.id]) doneCount += 1;
+        if (p.transportToNext) totalMinutes += parseMinutes(p.transportToNext.time);
+      });
+    });
+
+    const budget = computeBudget(days);
+    return {
+      totalPlaces: totalPlaces,
+      doneCount: doneCount,
+      totalMinutes: totalMinutes,
+      taxiCost: budget.taxi,
+      shoppingStatus: getShoppingBudgetStatus(),
+    };
+  }
+
+  function formatMinutesAsHM(minutes) {
+    if (minutes < 60) return minutes + "분";
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    return h + "시간" + (m > 0 ? " " + m + "분" : "");
+  }
+
+  function renderTripSummary() {
+    if (!dom.tripSummary) return;
+    const s = computeTripSummary();
+    dom.tripSummary.innerHTML =
+      tripSummaryItem(s.doneCount + " / " + s.totalPlaces, "방문 완료") +
+      tripSummaryItem(formatMinutesAsHM(s.totalMinutes), "총 이동시간") +
+      tripSummaryItem("¥" + s.taxiCost.toLocaleString(), "예상 택시비") +
+      tripSummaryItem(s.shoppingStatus.remaining != null ? formatYen(s.shoppingStatus.remaining) : "—", "남은 예산");
+  }
+
+  function tripSummaryItem(value, label) {
+    return (
+      '<div class="trip-summary-item"><span class="trip-summary-value">' +
+      value +
+      '</span><span class="trip-summary-label">' +
+      label +
       "</span></div>"
     );
   }
@@ -1423,6 +1898,8 @@
     renderCards(getEffectiveDay(state.dayIndex));
     updateMapDoneStates();
     renderChecklist();
+    renderNowCard(getEffectiveDay(state.dayIndex));
+    renderTripSummary();
   }
 
   function toggleChecklistBrand(brand) {
@@ -1506,7 +1983,93 @@
       const idx = Number(btn.dataset.idx);
       const next = day.places[idx + 1];
       if (next) goToPlace(next.id);
+      return;
     }
+
+    if (action === "move-place") {
+      movePlaceInDay(state.dayIndex, btn.dataset.placeId, btn.dataset.direction);
+      return;
+    }
+
+    if (action === "toggle-done-group") {
+      state.doneGroupExpanded = !state.doneGroupExpanded;
+      renderDoneGroup(getEffectiveDay(state.dayIndex));
+      return;
+    }
+
+    if (action === "toggle-timeline") {
+      state.timelineExpanded = !state.timelineExpanded;
+      renderTimeline(getEffectiveDay(state.dayIndex));
+      return;
+    }
+
+    if (action === "toggle-memo") {
+      const placeId = btn.dataset.placeId;
+      state.expandedMemos[placeId] = !state.expandedMemos[placeId];
+      renderCards(getEffectiveDay(state.dayIndex));
+      return;
+    }
+
+    if (action === "toggle-purchase-form") {
+      const form = btn.parentElement.querySelector(".purchase-form");
+      if (form) form.hidden = !form.hidden;
+      return;
+    }
+
+    if (action === "add-purchase") {
+      addPurchaseFromForm(btn);
+      return;
+    }
+
+    if (action === "delete-purchase") {
+      const placeId = btn.dataset.placeId;
+      const purchaseId = btn.dataset.purchaseId;
+      state.purchases[placeId] = (state.purchases[placeId] || []).filter((e) => e.id !== purchaseId);
+      persistPurchases();
+      renderCards(getEffectiveDay(state.dayIndex));
+      renderBudget();
+      renderTripSummary();
+      return;
+    }
+  }
+
+  function movePlaceInDay(dayIndex, placeId, direction) {
+    applyDayOrderChange(dayIndex, (order) => {
+      const idx = order.indexOf(placeId);
+      const targetIdx = direction === "prev" ? idx - 1 : idx + 1;
+      if (idx === -1 || targetIdx < 0 || targetIdx >= order.length) return order;
+      const next = order.slice();
+      const tmp = next[idx];
+      next[idx] = next[targetIdx];
+      next[targetIdx] = tmp;
+      return next;
+    });
+  }
+
+  function addPurchaseFromForm(btn) {
+    const section = btn.closest(".card-purchase-section");
+    const placeId = btn.dataset.placeId;
+    const itemInput = section.querySelector(".purchase-item-input");
+    const sizeInput = section.querySelector(".purchase-size-input");
+    const priceInput = section.querySelector(".purchase-price-input");
+    const item = itemInput.value.trim();
+    if (!item) {
+      showToast("상품명을 입력해주세요");
+      return;
+    }
+    const price = parseInt(priceInput.value, 10);
+    const entry = {
+      id: "purchase-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      item: item,
+      price: isNaN(price) ? 0 : price,
+      size: sizeInput.value.trim(),
+    };
+    state.purchases[placeId] = (state.purchases[placeId] || []).concat(entry);
+    persistPurchases();
+    renderCards(getEffectiveDay(state.dayIndex));
+    renderBudget();
+    renderTripSummary();
+    showToast(item + " 구매 기록 추가됨");
   }
 
   // ---------------------------------------------------------------------

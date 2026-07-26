@@ -98,6 +98,16 @@ const TRIP_DATA = {
           googleMapsQuery: "日本橋海鮮丼つじ半 東京ミッドタウン店 東京都港区赤坂9-7-1",
           note: "체크인 직후 가볍게, 8/12에 한 번 더 방문 예정",
           cost: 7000,
+          // 공식 매장 페이지(tsujihan-jp.com) 기준, 매일 동일
+          hours: {
+            0: { open: "11:00", close: "21:00" },
+            1: { open: "11:00", close: "21:00" },
+            2: { open: "11:00", close: "21:00" },
+            3: { open: "11:00", close: "21:00" },
+            4: { open: "11:00", close: "21:00" },
+            5: { open: "11:00", close: "21:00" },
+            6: { open: "11:00", close: "21:00" },
+          },
           transportToNext: { mode: "taxi", time: "20분", cost: 2500 },
         },
         {
@@ -136,6 +146,17 @@ const TRIP_DATA = {
           googleMapsQuery: "梅丘寿司の美登利 渋谷店 東京都渋谷区道玄坂1-12-3 渋谷マークシティ",
           note: "웨이팅 있을 수 있음",
           cost: 8000,
+          // 공식 사이트(sushinomidori.co.jp) + 시부야 마크시티 공식 테넌트 페이지 기준.
+          // 평일은 점심~저녁 사이 브레이크타임(15:00~17:00) 있음, 주말/공휴일은 안 쉬고 직통 영업
+          hours: {
+            0: { open: "11:00", close: "21:00" },
+            1: { open: "11:00", close: "21:00", breakStart: "15:00", breakEnd: "17:00" },
+            2: { open: "11:00", close: "21:00", breakStart: "15:00", breakEnd: "17:00" },
+            3: { open: "11:00", close: "21:00", breakStart: "15:00", breakEnd: "17:00" },
+            4: { open: "11:00", close: "21:00", breakStart: "15:00", breakEnd: "17:00" },
+            5: { open: "11:00", close: "21:00", breakStart: "15:00", breakEnd: "17:00" },
+            6: { open: "11:00", close: "21:00" },
+          },
           transportToNext: { mode: "walk", time: "5분", cost: 0 },
         },
         {
@@ -150,6 +171,16 @@ const TRIP_DATA = {
           googleMapsQuery: "ヴィヴィアン・ウエストウッド RED LABEL 西武渋谷店 東京都渋谷区宇田川町21-1",
           note: "세이부 시부야 A관 3F",
           cost: 25000,
+          // 세이부 시부야 공식 사이트(sogo-seibu.jp) 기준 A관 건물 영업시간, 매일 동일
+          hours: {
+            0: { open: "10:00", close: "20:00" },
+            1: { open: "10:00", close: "20:00" },
+            2: { open: "10:00", close: "20:00" },
+            3: { open: "10:00", close: "20:00" },
+            4: { open: "10:00", close: "20:00" },
+            5: { open: "10:00", close: "20:00" },
+            6: { open: "10:00", close: "20:00" },
+          },
           transportToNext: { mode: "walk", time: "3분", cost: 0 },
         },
         {
@@ -164,6 +195,16 @@ const TRIP_DATA = {
           googleMapsQuery: "カインドオル 渋谷店 東京都渋谷区宇田川町29-8",
           note: "중고 명품 매입/판매 편집숍",
           cost: 35000,
+          // 공식 사이트(kind.co.jp/shibuya) 기준, 매일 동일
+          hours: {
+            0: { open: "12:00", close: "20:00" },
+            1: { open: "12:00", close: "20:00" },
+            2: { open: "12:00", close: "20:00" },
+            3: { open: "12:00", close: "20:00" },
+            4: { open: "12:00", close: "20:00" },
+            5: { open: "12:00", close: "20:00" },
+            6: { open: "12:00", close: "20:00" },
+          },
           transportToNext: { mode: "walk", time: "2분", cost: 0 },
         },
         {
@@ -178,6 +219,16 @@ const TRIP_DATA = {
           googleMapsQuery: "カインドオル 渋谷神南店 東京都渋谷区神南1-17-5",
           note: "",
           cost: 35000,
+          // 공식 사이트(kind.co.jp/shibuyajinnan) 기준, 매일 동일
+          hours: {
+            0: { open: "11:00", close: "20:00" },
+            1: { open: "11:00", close: "20:00" },
+            2: { open: "11:00", close: "20:00" },
+            3: { open: "11:00", close: "20:00" },
+            4: { open: "11:00", close: "20:00" },
+            5: { open: "11:00", close: "20:00" },
+            6: { open: "11:00", close: "20:00" },
+          },
           transportToNext: { mode: "walk", time: "1분", cost: 0 },
         },
         {
@@ -192,6 +243,16 @@ const TRIP_DATA = {
           googleMapsQuery: "RAGTAG 渋谷店 東京都渋谷区神南1-17-7",
           note: "KINDAL 시부야신난점 바로 옆 건물",
           cost: 30000,
+          // 공식 사이트(ragtag.jp) 기준, 매일 동일
+          hours: {
+            0: { open: "11:00", close: "20:00" },
+            1: { open: "11:00", close: "20:00" },
+            2: { open: "11:00", close: "20:00" },
+            3: { open: "11:00", close: "20:00" },
+            4: { open: "11:00", close: "20:00" },
+            5: { open: "11:00", close: "20:00" },
+            6: { open: "11:00", close: "20:00" },
+          },
           transportToNext: { mode: "walk", time: "3분", cost: 0 },
         },
         {
@@ -206,6 +267,16 @@ const TRIP_DATA = {
           googleMapsQuery: "セカンドストリート 渋谷神南店 東京都渋谷区神南1-22-9",
           note: "",
           cost: 20000,
+          // 공식 사이트(2ndstreet.jp) 기준 확인(직접 접속은 봇 차단으로 2차 출처 교차검증), 매일 동일
+          hours: {
+            0: { open: "11:00", close: "21:00" },
+            1: { open: "11:00", close: "21:00" },
+            2: { open: "11:00", close: "21:00" },
+            3: { open: "11:00", close: "21:00" },
+            4: { open: "11:00", close: "21:00" },
+            5: { open: "11:00", close: "21:00" },
+            6: { open: "11:00", close: "21:00" },
+          },
           transportToNext: { mode: "taxi", time: "9분", cost: 1100 },
         },
         {
@@ -222,6 +293,16 @@ const TRIP_DATA = {
           note: "에비스역 서쪽 출구 도보 2분, 중고 명품 매입/판매 편집숍",
           cost: 60000,
           relatedBrands: ["COMOLI", "AURALEE"],
+          // 공식 사이트(kind.co.jp/ebisu) 기준 — 에비스점만 수요일 정기휴무
+          hours: {
+            0: { open: "12:00", close: "19:00" },
+            1: { open: "12:00", close: "19:00" },
+            2: { open: "12:00", close: "19:00" },
+            3: null,
+            4: { open: "12:00", close: "19:00" },
+            5: { open: "12:00", close: "19:00" },
+            6: { open: "12:00", close: "19:00" },
+          },
           transportToNext: { mode: "walk", time: "7분", cost: 0 },
         },
         {
@@ -236,6 +317,16 @@ const TRIP_DATA = {
           googleMapsQuery: "KAPITAL レッグス店 東京都渋谷区恵比寿南2-23-12",
           note: "데님 & 패치워크 아이템 위주로",
           cost: 47000,
+          // 공식 사이트(kapital.jp) 기준, 매일 동일(비정기 휴무 있을 수 있음)
+          hours: {
+            0: { open: "11:00", close: "20:00" },
+            1: { open: "11:00", close: "20:00" },
+            2: { open: "11:00", close: "20:00" },
+            3: { open: "11:00", close: "20:00" },
+            4: { open: "11:00", close: "20:00" },
+            5: { open: "11:00", close: "20:00" },
+            6: { open: "11:00", close: "20:00" },
+          },
           transportToNext: { mode: "walk", time: "13분", cost: 0 },
         },
         {
@@ -250,6 +341,16 @@ const TRIP_DATA = {
           googleMapsQuery: "nanamica DAIKANYAMA 東京都渋谷区猿楽町26-13",
           note: "다이칸야마 멘즈 본점, 고어텍스 라인 체크",
           cost: 35000,
+          // 공식 사이트(nanamica.com) 기준, 매일 동일
+          hours: {
+            0: { open: "11:00", close: "19:00" },
+            1: { open: "11:00", close: "19:00" },
+            2: { open: "11:00", close: "19:00" },
+            3: { open: "11:00", close: "19:00" },
+            4: { open: "11:00", close: "19:00" },
+            5: { open: "11:00", close: "19:00" },
+            6: { open: "11:00", close: "19:00" },
+          },
           transportToNext: { mode: "taxi", time: "45분", cost: 8000 },
         },
         {
@@ -292,6 +393,16 @@ const TRIP_DATA = {
           googleMapsQuery: "挽肉と米 渋谷店 東京都渋谷区道玄坂2-28-1",
           note: "함바그 전문점, 웨이팅 감안",
           cost: 4000,
+          // 공식 사이트(hikinikutocome.com) 기준(직접 접속 봇 차단으로 2차 출처 교차검증) — 매주 수요일 정기휴무, 점심/저녁 사이 브레이크타임
+          hours: {
+            0: { open: "11:00", close: "21:00", breakStart: "15:00", breakEnd: "17:00" },
+            1: { open: "11:00", close: "21:00", breakStart: "15:00", breakEnd: "17:00" },
+            2: { open: "11:00", close: "21:00", breakStart: "15:00", breakEnd: "17:00" },
+            3: null,
+            4: { open: "11:00", close: "21:00", breakStart: "15:00", breakEnd: "17:00" },
+            5: { open: "11:00", close: "21:00", breakStart: "15:00", breakEnd: "17:00" },
+            6: { open: "11:00", close: "21:00", breakStart: "15:00", breakEnd: "17:00" },
+          },
           transportToNext: { mode: "walk", time: "5분", cost: 0 },
         },
         {
@@ -307,6 +418,16 @@ const TRIP_DATA = {
           googleMapsQuery: "ディズニーストア 渋谷公園通り店 東京都渋谷区宇田川町20-15",
           note: "※ 원래 있던 하라주쿠 알타점은 2020년 폐점해서 현재 영업 중인 시부야점으로 변경함. 한정판 굿즈 매장 입고 확인",
           cost: 15000,
+          // 공식 사이트(disney.co.jp/store) 기준 — 평일과 주말 영업시간이 다름
+          hours: {
+            0: { open: "10:00", close: "20:00" },
+            1: { open: "11:00", close: "20:00" },
+            2: { open: "11:00", close: "20:00" },
+            3: { open: "11:00", close: "20:00" },
+            4: { open: "11:00", close: "20:00" },
+            5: { open: "11:00", close: "20:00" },
+            6: { open: "10:00", close: "20:00" },
+          },
           transportToNext: { mode: "taxi", time: "10분", cost: 1300 },
         },
         {
@@ -321,6 +442,16 @@ const TRIP_DATA = {
           googleMapsQuery: "COMOLI AOYAMA 東京都港区南青山6-1-3 コレッツィオーネ",
           note: "미나토구 소재 유일한 COMOLI 직영 매장 (2F)",
           cost: 45000,
+          // 공식 사이트(comoli.jp/shop) 기준, 매일 동일
+          hours: {
+            0: { open: "12:00", close: "20:00" },
+            1: { open: "12:00", close: "20:00" },
+            2: { open: "12:00", close: "20:00" },
+            3: { open: "12:00", close: "20:00" },
+            4: { open: "12:00", close: "20:00" },
+            5: { open: "12:00", close: "20:00" },
+            6: { open: "12:00", close: "20:00" },
+          },
           transportToNext: { mode: "walk", time: "3분", cost: 0 },
         },
         {
@@ -335,6 +466,16 @@ const TRIP_DATA = {
           googleMapsQuery: "AURALEE TOKYO 東京都港区南青山6-3-2 QCcube南青山63",
           note: "AURALEE 브랜드 첫 직영 매장",
           cost: 38000,
+          // 공식 사이트(auralee.jp/store) 기준, 매일 동일(비정기 휴무 있을 수 있음)
+          hours: {
+            0: { open: "12:00", close: "20:00" },
+            1: { open: "12:00", close: "20:00" },
+            2: { open: "12:00", close: "20:00" },
+            3: { open: "12:00", close: "20:00" },
+            4: { open: "12:00", close: "20:00" },
+            5: { open: "12:00", close: "20:00" },
+            6: { open: "12:00", close: "20:00" },
+          },
           transportToNext: { mode: "walk", time: "5분", cost: 0 },
         },
         {
@@ -349,6 +490,16 @@ const TRIP_DATA = {
           googleMapsQuery: "KAPTAIN SUNSHINE FLAGSHIP STORE 東京都港区南青山5-18-10",
           note: "2025년 오픈한 브랜드 첫 플래그십 스토어",
           cost: 52000,
+          // 공식 사이트(kaptainsunshine.com/store) 기준 영업시간 + 오픈 당시 보도자료 기준 월요일 정기휴무(공식 페이지 재확인 권장)
+          hours: {
+            0: { open: "12:00", close: "20:00" },
+            1: null,
+            2: { open: "12:00", close: "20:00" },
+            3: { open: "12:00", close: "20:00" },
+            4: { open: "12:00", close: "20:00" },
+            5: { open: "12:00", close: "20:00" },
+            6: { open: "12:00", close: "20:00" },
+          },
           transportToNext: { mode: "taxi", time: "20분", cost: 2200 },
         },
         {
@@ -379,6 +530,16 @@ const TRIP_DATA = {
           googleMapsQuery: "PORTER CLASSIC GINZA GINZA FIVE 東京都中央区銀座5-1",
           note: "아쿠아파크에서 긴자로 이동, 가방 & 소품 라인 위주",
           cost: 42000,
+          // 공식 사이트(porterclassic.com) 기준, 매일 동일
+          hours: {
+            0: { open: "12:00", close: "20:00" },
+            1: { open: "12:00", close: "20:00" },
+            2: { open: "12:00", close: "20:00" },
+            3: { open: "12:00", close: "20:00" },
+            4: { open: "12:00", close: "20:00" },
+            5: { open: "12:00", close: "20:00" },
+            6: { open: "12:00", close: "20:00" },
+          },
           transportToNext: { mode: "taxi", time: "15분", cost: 1800 },
         },
         {
@@ -432,6 +593,16 @@ const TRIP_DATA = {
           googleMapsQuery: "梅丘寿司の美登利 渋谷店 東京都渋谷区道玄坂1-12-3 渋谷マークシティ",
           note: "8/10에 이어 두 번째 방문",
           cost: 8000,
+          // 8/10 첫 방문(midori-sushi-shibuya-1)과 동일 매장 — 같은 영업시간
+          hours: {
+            0: { open: "11:00", close: "21:00" },
+            1: { open: "11:00", close: "21:00", breakStart: "15:00", breakEnd: "17:00" },
+            2: { open: "11:00", close: "21:00", breakStart: "15:00", breakEnd: "17:00" },
+            3: { open: "11:00", close: "21:00", breakStart: "15:00", breakEnd: "17:00" },
+            4: { open: "11:00", close: "21:00", breakStart: "15:00", breakEnd: "17:00" },
+            5: { open: "11:00", close: "21:00", breakStart: "15:00", breakEnd: "17:00" },
+            6: { open: "11:00", close: "21:00" },
+          },
           transportToNext: { mode: "walk", time: "5분", cost: 0 },
         },
         {
@@ -446,6 +617,16 @@ const TRIP_DATA = {
           googleMapsQuery: "ディズニーストア 渋谷公園通り店 東京都渋谷区宇田川町20-15",
           note: "8/11에 이어 재방문, 추가 입고 확인",
           cost: 8000,
+          // 8/11 첫 방문(disney-store)과 동일 매장 — 같은 영업시간
+          hours: {
+            0: { open: "10:00", close: "20:00" },
+            1: { open: "11:00", close: "20:00" },
+            2: { open: "11:00", close: "20:00" },
+            3: { open: "11:00", close: "20:00" },
+            4: { open: "11:00", close: "20:00" },
+            5: { open: "11:00", close: "20:00" },
+            6: { open: "10:00", close: "20:00" },
+          },
           transportToNext: { mode: "walk", time: "7분", cost: 0 },
         },
         {
@@ -460,6 +641,16 @@ const TRIP_DATA = {
           googleMapsQuery: "HYSTERIC GLAMOUR SHIBUYA 東京都渋谷区神宮前6-23-2",
           note: "",
           cost: 15000,
+          // 공식 스토어파인더(hystericglamour.jp/store) 기준, 매일 동일
+          hours: {
+            0: { open: "11:00", close: "20:00" },
+            1: { open: "11:00", close: "20:00" },
+            2: { open: "11:00", close: "20:00" },
+            3: { open: "11:00", close: "20:00" },
+            4: { open: "11:00", close: "20:00" },
+            5: { open: "11:00", close: "20:00" },
+            6: { open: "11:00", close: "20:00" },
+          },
           transportToNext: { mode: "walk", time: "10분", cost: 0 },
         },
         {
@@ -474,6 +665,16 @@ const TRIP_DATA = {
           googleMapsQuery: "BEAMS 原宿 東京都渋谷区神宮前3-24-7",
           note: "메이지진구마에역 도보 5분, BEAMS 본점",
           cost: 20000,
+          // 공식 사이트(beams.co.jp) 기준 — 평일/주말 오픈 시각이 다름
+          hours: {
+            0: { open: "11:00", close: "20:00" },
+            1: { open: "12:00", close: "20:00" },
+            2: { open: "12:00", close: "20:00" },
+            3: { open: "12:00", close: "20:00" },
+            4: { open: "12:00", close: "20:00" },
+            5: { open: "12:00", close: "20:00" },
+            6: { open: "11:00", close: "20:00" },
+          },
           // TEATORA 본매장(화·수 휴무, 8/12은 수요일이라 스킵)은 가지 않기로 해서
           // BEAMS에서 바로 RAGTAG로 이동
           transportToNext: { mode: "walk", time: "8분", cost: 0 },
@@ -490,6 +691,16 @@ const TRIP_DATA = {
           googleMapsQuery: "RAGTAG 原宿店 東京都渋谷区神宮前5-17-9",
           note: "캣스트리트, 빈티지 & 중고 명품 매입/판매",
           cost: 30000,
+          // 공식 사이트(ragtag.jp) 기준, 매일 동일
+          hours: {
+            0: { open: "11:00", close: "20:00" },
+            1: { open: "11:00", close: "20:00" },
+            2: { open: "11:00", close: "20:00" },
+            3: { open: "11:00", close: "20:00" },
+            4: { open: "11:00", close: "20:00" },
+            5: { open: "11:00", close: "20:00" },
+            6: { open: "11:00", close: "20:00" },
+          },
           transportToNext: { mode: "walk", time: "3분", cost: 0 },
         },
         {
@@ -502,8 +713,18 @@ const TRIP_DATA = {
           recommendedDuration: "20~30분",
           address: "시부야구 진구마에 6가 인근",
           googleMapsQuery: "Arena Shop Tokyo 東京都渋谷区神宮前6丁目",
-          note: "수영복 & 스포츠웨어",
+          note: "수영복 & 스포츠웨어 브랜드 arena의 공식 글로벌 플래그십 스토어",
           cost: 12000,
+          // 공식 브랜드 매장 리스트(store.descente.co.jp/arena/stores) 기준, 매일 동일(비정기 휴무 있을 수 있음)
+          hours: {
+            0: { open: "11:00", close: "20:00" },
+            1: { open: "11:00", close: "20:00" },
+            2: { open: "11:00", close: "20:00" },
+            3: { open: "11:00", close: "20:00" },
+            4: { open: "11:00", close: "20:00" },
+            5: { open: "11:00", close: "20:00" },
+            6: { open: "11:00", close: "20:00" },
+          },
           transportToNext: { mode: "walk", time: "6분", cost: 0 },
         },
         {
@@ -518,6 +739,16 @@ const TRIP_DATA = {
           googleMapsQuery: "MoMA Design Store 表参道 東京都渋谷区神宮前5-10-1 GYRE",
           note: "오모테산도 GYRE 빌딩",
           cost: 10000,
+          // 공식 MoMA Design Store 사이트 + GYRE 공식 테넌트 페이지 기준 일치, 매일 동일
+          hours: {
+            0: { open: "11:00", close: "20:00" },
+            1: { open: "11:00", close: "20:00" },
+            2: { open: "11:00", close: "20:00" },
+            3: { open: "11:00", close: "20:00" },
+            4: { open: "11:00", close: "20:00" },
+            5: { open: "11:00", close: "20:00" },
+            6: { open: "11:00", close: "20:00" },
+          },
           transportToNext: { mode: "walk", time: "2분", cost: 0 },
         },
         {
@@ -532,6 +763,16 @@ const TRIP_DATA = {
           googleMapsQuery: "カインドオル 原宿店 東京都渋谷区神宮前4-29-3",
           note: "중고 명품 매입/판매 편집숍",
           cost: 35000,
+          // 공식 사이트(kind.co.jp/harajuku) 기준, 매일 동일
+          hours: {
+            0: { open: "11:00", close: "20:00" },
+            1: { open: "11:00", close: "20:00" },
+            2: { open: "11:00", close: "20:00" },
+            3: { open: "11:00", close: "20:00" },
+            4: { open: "11:00", close: "20:00" },
+            5: { open: "11:00", close: "20:00" },
+            6: { open: "11:00", close: "20:00" },
+          },
           transportToNext: { mode: "walk", time: "3분", cost: 0 },
         },
         {
@@ -546,6 +787,16 @@ const TRIP_DATA = {
           googleMapsQuery: "セカンドストリート 原宿店 東京都渋谷区神宮前4-26-4",
           note: "",
           cost: 20000,
+          // 공식 사이트(2ndstreet.jp) 기준 확인(직접 접속은 봇 차단으로 2차 출처 교차검증), 매일 동일
+          hours: {
+            0: { open: "11:00", close: "21:00" },
+            1: { open: "11:00", close: "21:00" },
+            2: { open: "11:00", close: "21:00" },
+            3: { open: "11:00", close: "21:00" },
+            4: { open: "11:00", close: "21:00" },
+            5: { open: "11:00", close: "21:00" },
+            6: { open: "11:00", close: "21:00" },
+          },
           transportToNext: { mode: "taxi", time: "13분", cost: 1600 },
         },
         {
@@ -561,6 +812,16 @@ const TRIP_DATA = {
           googleMapsQuery: "日本橋海鮮丼つじ半 東京ミッドタウン店 東京都港区赤坂9-7-1",
           note: "8/9에 이어 두 번째 방문",
           cost: 7000,
+          // 8/9 첫 방문(tsujihan-midtown)과 동일 매장 — 같은 영업시간
+          hours: {
+            0: { open: "11:00", close: "21:00" },
+            1: { open: "11:00", close: "21:00" },
+            2: { open: "11:00", close: "21:00" },
+            3: { open: "11:00", close: "21:00" },
+            4: { open: "11:00", close: "21:00" },
+            5: { open: "11:00", close: "21:00" },
+            6: { open: "11:00", close: "21:00" },
+          },
           transportToNext: { mode: "taxi", time: "15분", cost: 1800 },
         },
         {
@@ -618,6 +879,16 @@ const TRIP_DATA = {
           googleMapsQuery: "カインドオル 新宿店 東京都新宿区新宿3-28-2",
           note: "신주쿠역 바로 앞, 나리타 익스프레스로 공항 직행 가능 (짐은 미리 호텔에서 챙겨서 이동)",
           cost: 35000,
+          // 공식 사이트(kind.co.jp/shinjuku) 기준, 매일 동일
+          hours: {
+            0: { open: "12:00", close: "21:00" },
+            1: { open: "12:00", close: "21:00" },
+            2: { open: "12:00", close: "21:00" },
+            3: { open: "12:00", close: "21:00" },
+            4: { open: "12:00", close: "21:00" },
+            5: { open: "12:00", close: "21:00" },
+            6: { open: "12:00", close: "21:00" },
+          },
           transportToNext: null,
         },
       ],
