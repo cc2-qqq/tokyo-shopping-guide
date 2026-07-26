@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no"
+    />
+    <title>도쿄 디즈니랜드 지도</title>
+    <meta name="description" content="도쿄 디즈니랜드 파크 내 길찾기 지도" />
+
+    <meta name="theme-color" content="#0B1F4B" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Disney Map" />
+    <link rel="manifest" href="manifest.json" />
+    <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icons/icon.svg" />
+
+    <!-- Leaflet (지도) -->
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+
+    <link rel="stylesheet" href="css/style.css" />
+    <link rel="stylesheet" href="css/disney.css" />
+  </head>
+  <body class="disney-page">
+    <div id="app">
+      <div class="disney-app" id="disneyApp">
+        <!-- 상단 고정 검색바 -->
+        <div class="disney-topbar">
+          <a href="index.html" class="disney-back-btn" aria-label="여행 가이드로 돌아가기">←</a>
+          <div class="disney-search-wrap">
+            <input
+              type="text"
+              id="disneySearchInput"
+              class="disney-search-input"
+              placeholder="어트랙션 · 레스토랑 · 샵 검색"
+              autocomplete="off"
+            />
+          </div>
+        </div>
+        <div class="disney-search-results" id="disneySearchResults" hidden></div>
+
+        <!-- 지도 -->
+        <div id="disneyMap" class="disney-map"></div>
+
+        <!-- Quick Find -->
+        <div class="disney-quickfind" id="disneyQuickFind"></div>
+
+        <!-- 경로 안내 바 -->
+        <div class="disney-route-bar" id="disneyRouteBar" hidden></div>
+
+        <!-- 하단 시트 (목록 / 즐겨찾기 / 추천 동선) -->
+        <div class="disney-sheet" id="disneySheet">
+          <button type="button" class="disney-sheet-handle" id="disneySheetHandle" aria-label="목록 펼치기/접기"></button>
+          <div class="disney-sheet-tabs" id="disneySheetTabs"></div>
+          <div class="disney-sheet-content" id="disneySheetContent"></div>
+        </div>
+
+        <!-- 시설 상세 바텀시트 -->
+        <div class="disney-detail-overlay" id="disneyDetailOverlay">
+          <div class="disney-detail-sheet" id="disneyDetailSheet"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <!-- Leaflet -->
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+
+    <script src="js/utils.js"></script>
+    <script src="js/disneyData.js"></script>
+    <script src="js/disney.js"></script>
+  </body>
+</html>

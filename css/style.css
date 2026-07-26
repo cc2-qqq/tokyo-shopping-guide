@@ -883,6 +883,16 @@ button {
   margin-top: 14px;
 }
 
+.disney-map-link-btn {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: center;
+  margin-top: 12px;
+  background: linear-gradient(135deg, #1a2f6b, #3a5cc9);
+  text-decoration: none;
+}
+
 .btn {
   position: relative;
   overflow: hidden;

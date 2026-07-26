@@ -1,0 +1,552 @@
+/* ============================================================================
+   Tokyo Disneyland Interactive Map — 전용 레이아웃
+   ============================================================================
+   css/style.css의 색상/타이포 토큰은 그대로 쓰고, 이 파일은 지도 중심의
+   풀스크린 앱 레이아웃(고정 검색바 + 지도 + 바텀시트)만 다룬다.
+   ============================================================================ */
+
+body.disney-page {
+  overflow: hidden;
+}
+body.disney-page #app {
+  height: 100vh;
+  height: 100dvh;
+  padding: 0;
+  overflow: hidden;
+}
+
+.disney-app {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+}
+
+/* ---------------------------------------------------------------------
+   상단 검색바
+   --------------------------------------------------------------------- */
+.disney-topbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: calc(12px + var(--safe-top)) 14px 12px;
+  background: var(--color-card);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  z-index: 20;
+}
+.disney-back-btn {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--color-gray-bg);
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  font-size: 18px;
+}
+.disney-search-wrap {
+  flex: 1;
+  min-width: 0;
+}
+.disney-search-input {
+  width: 100%;
+  border: none;
+  background: var(--color-gray-bg);
+  border-radius: var(--radius-pill);
+  padding: 10px 16px;
+  font-size: 14.5px;
+  font-family: inherit;
+  color: var(--color-text);
+}
+.disney-search-input:focus {
+  outline: 2px solid var(--color-blue);
+}
+
+.disney-search-results {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  top: 66px;
+  max-height: 50vh;
+  overflow-y: auto;
+  background: var(--color-card);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  z-index: 25;
+}
+.disney-search-results:empty {
+  display: none;
+}
+
+.disney-result-row,
+.disney-list-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--color-divider);
+  cursor: pointer;
+}
+.disney-result-row:last-child,
+.disney-list-row:last-child {
+  border-bottom: none;
+}
+.disney-result-row:active,
+.disney-list-row:active {
+  background: var(--color-gray-bg);
+}
+.disney-row-icon {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  background: var(--color-blue);
+}
+.disney-row-icon.restaurant {
+  background: var(--color-red);
+}
+.disney-row-icon.shop {
+  background: var(--color-orange);
+}
+.disney-row-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.disney-row-name {
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.disney-row-meta {
+  font-size: 11.5px;
+  color: var(--color-text-secondary);
+}
+.disney-row-fav {
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  font-size: 18px;
+  color: var(--color-gray-light);
+  cursor: pointer;
+  line-height: 1;
+}
+.disney-row-fav.active {
+  color: var(--color-red);
+}
+.disney-list-row.done .disney-row-name {
+  color: var(--color-text-secondary);
+  text-decoration: line-through;
+}
+.disney-list-row.done .disney-row-icon {
+  filter: grayscale(1);
+  opacity: 0.5;
+}
+
+/* ---------------------------------------------------------------------
+   지도
+   --------------------------------------------------------------------- */
+.disney-map {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.disney-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  background: var(--color-blue);
+  border: 2px solid #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+.disney-marker span {
+  transform: rotate(45deg);
+  font-size: 14px;
+}
+.disney-marker.restaurant {
+  background: var(--color-red);
+}
+.disney-marker.shop {
+  background: var(--color-orange);
+}
+.disney-marker.done {
+  background: var(--color-gray);
+  opacity: 0.6;
+}
+.disney-marker.active {
+  transform: rotate(-45deg) scale(1.2);
+  z-index: 10;
+}
+
+/* ---------------------------------------------------------------------
+   Quick Find 플로팅 메뉴
+   --------------------------------------------------------------------- */
+.disney-quickfind {
+  position: absolute;
+  right: 12px;
+  top: 78px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 15;
+}
+.disney-quickfind-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: var(--color-card);
+  box-shadow: var(--shadow-md);
+  font-size: 19px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.disney-quickfind-btn:active {
+  transform: scale(0.94);
+}
+.disney-quickfind-btn.locate-active {
+  background: var(--color-blue);
+}
+
+/* ---------------------------------------------------------------------
+   경로 안내 바
+   --------------------------------------------------------------------- */
+.disney-route-bar {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 18;
+  background: var(--color-card);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: 12px 14px;
+}
+.disney-route-bar[hidden] {
+  display: none;
+}
+.disney-route-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.disney-route-name {
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.disney-route-close {
+  flex-shrink: 0;
+  border: none;
+  background: var(--color-gray-bg);
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  font-size: 12px;
+  cursor: pointer;
+}
+.disney-route-meta {
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.disney-route-meta strong {
+  color: var(--color-text);
+}
+.disney-route-warn {
+  margin-top: 6px;
+  font-size: 10.5px;
+  color: var(--color-orange-dark);
+}
+
+/* ---------------------------------------------------------------------
+   하단 시트
+   --------------------------------------------------------------------- */
+.disney-sheet {
+  position: relative;
+  flex-shrink: 0;
+  background: var(--color-card);
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12);
+  z-index: 12;
+  display: flex;
+  flex-direction: column;
+  height: 132px;
+  transition: height 0.25s ease;
+  overflow: hidden;
+}
+.disney-sheet.expanded {
+  height: 62vh;
+}
+.disney-sheet-handle {
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  padding: 10px 0 4px;
+  cursor: pointer;
+}
+.disney-sheet-handle::after {
+  content: "";
+  display: block;
+  width: 36px;
+  height: 4px;
+  margin: 0 auto;
+  border-radius: var(--radius-pill);
+  background: var(--color-gray-light);
+}
+.disney-sheet-tabs {
+  flex-shrink: 0;
+  display: flex;
+  gap: 8px;
+  padding: 6px 14px 8px;
+}
+.disney-sheet-tab {
+  border: none;
+  background: var(--color-gray-bg);
+  color: var(--color-text-secondary);
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 7px 13px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+}
+.disney-sheet-tab.active {
+  background: var(--color-blue);
+  color: #fff;
+}
+.disney-sheet-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 0 calc(12px + var(--safe-bottom));
+}
+.disney-sheet-sort-row {
+  display: flex;
+  gap: 8px;
+  padding: 0 14px 8px;
+}
+.disney-sheet-sort-btn {
+  border: none;
+  background: none;
+  color: var(--color-text-secondary);
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+.disney-sheet-sort-btn.active {
+  color: var(--color-blue);
+}
+.disney-empty-note {
+  padding: 30px 20px;
+  text-align: center;
+  color: var(--color-gray);
+  font-size: 13px;
+}
+
+/* ---------------------------------------------------------------------
+   시설 상세 바텀시트
+   --------------------------------------------------------------------- */
+.disney-detail-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 100;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+.disney-detail-overlay.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+.disney-detail-sheet {
+  width: 100%;
+  max-width: 480px;
+  max-height: 82vh;
+  overflow-y: auto;
+  background: var(--color-card);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  padding: 18px 18px calc(18px + var(--safe-bottom));
+  transform: translateY(16px);
+  transition: transform 0.2s ease;
+}
+.disney-detail-overlay.show .disney-detail-sheet {
+  transform: translateY(0);
+}
+
+.disney-detail-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.disney-detail-icon {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  background: var(--color-blue);
+}
+.disney-detail-icon.restaurant {
+  background: var(--color-red);
+}
+.disney-detail-icon.shop {
+  background: var(--color-orange);
+}
+.disney-detail-title-group {
+  flex: 1;
+  min-width: 0;
+}
+.disney-detail-name {
+  font-size: 18px;
+  font-weight: 800;
+  margin: 0 0 3px;
+}
+.disney-detail-area {
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+}
+.disney-detail-fav {
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  font-size: 24px;
+  color: var(--color-gray-light);
+  cursor: pointer;
+}
+.disney-detail-fav.active {
+  color: var(--color-red);
+}
+
+.disney-detail-desc {
+  margin: 12px 0 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--color-text);
+}
+.disney-detail-meta-row {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.disney-detail-chip {
+  font-size: 11.5px;
+  font-weight: 700;
+  background: var(--color-gray-bg);
+  padding: 5px 10px;
+  border-radius: var(--radius-pill);
+}
+.disney-detail-highlights {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.disney-detail-highlight {
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+}
+.disney-detail-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+.disney-detail-actions .btn {
+  flex: 1;
+}
+.disney-detail-memo {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--color-divider);
+}
+.disney-done-badge {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-green);
+  background: rgba(52, 199, 89, 0.12);
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+}
+.disney-section-label {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+}
+.disney-detail-memo textarea {
+  width: 100%;
+  min-height: 56px;
+  resize: vertical;
+  font-family: inherit;
+  font-size: 13px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text);
+  margin-top: 6px;
+}
+
+/* ---------------------------------------------------------------------
+   경로선(직선) 위 "직선 거리 기준" 경고 라벨
+   --------------------------------------------------------------------- */
+.user-location-heading {
+  position: absolute;
+  left: 0;
+  top: -22px;
+  transform: translate(-50%, 0);
+  transform-origin: 50% 22px;
+  color: var(--color-blue);
+  font-size: 16px;
+  font-weight: 900;
+  z-index: 4;
+  line-height: 1;
+}
+
+.disney-route-chip {
+  background: rgba(28, 28, 30, 0.85);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+}

@@ -370,6 +370,7 @@ const TRIP_DATA = {
           cost: 20000,
           // 디즈니랜드는 고정 요일 스케줄이 아니라 날짜별 운영시간표(공식 앱/사이트)를 따름
           hoursNote: "날짜별로 운영시간이 다름, 공식 앱에서 방문일 스케줄 확인 필수",
+          disneyMapLink: "disneyland.html",
           transportToNext: null,
         },
       ],

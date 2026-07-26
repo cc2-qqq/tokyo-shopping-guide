@@ -1076,14 +1076,7 @@
   // 실시간으로 추정한다 — 도보 20분 이내면 도보, 아니면 택시로 판단하고
   // 택시 요금은 도쿄 기본요금 체계로 근사한다. OSRM이 실패하면 직선거리로 대체.
   // ---------------------------------------------------------------------
-  function haversineMeters(a, b) {
-    const R = 6371000;
-    const toRad = (d) => (d * Math.PI) / 180;
-    const dLat = toRad(b[0] - a[0]);
-    const dLng = toRad(b[1] - a[1]);
-    const x = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a[0])) * Math.cos(toRad(b[0])) * Math.sin(dLng / 2) ** 2;
-    return 2 * R * Math.asin(Math.sqrt(x));
-  }
+  // haversineMeters는 js/utils.js(공용 유틸)에 정의되어 있다.
 
   // 2026년 도쿄 소형 택시 기준 근사치 (초기요금 1.052km까지 500엔, 이후 237m당 100엔)
   function estimateTaxiFare(meters) {
@@ -1509,6 +1502,11 @@
       hoursHtml +
       (place.note ? '<p class="place-card-note">' + escapeHtml(place.note) + "</p>" : "") +
       relatedHtml +
+      (place.disneyMapLink
+        ? '<a class="btn btn-primary disney-map-link-btn" href="' +
+          place.disneyMapLink +
+          '">🗺️ 파크 지도에서 길찾기 열기</a>'
+        : "") +
       '<div class="place-card-actions">' +
       '<a class="btn btn-icon" href="https://www.google.com/maps/dir/?api=1&destination=' +
       lat +
@@ -2128,9 +2126,5 @@
     toastTimer = setTimeout(() => dom.toast.classList.remove("show"), action ? 4000 : 1800);
   }
 
-  function escapeHtml(str) {
-    const div = document.createElement("div");
-    div.textContent = String(str);
-    return div.innerHTML;
-  }
+  // escapeHtml은 js/utils.js(공용 유틸)에 정의되어 있다.
 })();
