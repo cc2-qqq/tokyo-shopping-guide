@@ -391,6 +391,14 @@ button {
 .map-pin-dot.food {
   background: var(--color-red);
 }
+.map-pin-dot.pin-text {
+  width: auto;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: var(--radius-pill);
+  font-size: 9px;
+  letter-spacing: 0.02em;
+}
 
 .map-label {
   position: absolute;

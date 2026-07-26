@@ -814,7 +814,12 @@
     const bounds = [hotelCoords];
     day.places.forEach((place, idx) => {
       bounds.push(place.coords);
-      addPlaceLabel(place, idx + 1);
+      let orderLabel = String(idx + 1);
+      if (day.places.length > 1) {
+        if (idx === 0) orderLabel = "Start";
+        else if (idx === day.places.length - 1) orderLabel = "End";
+      }
+      addPlaceLabel(place, orderLabel);
     });
 
     if (day.places.length === 0) {
@@ -1132,14 +1137,17 @@
     const isDone = !!state.donePlaces[place.id];
     const colorKind = getColorKind(place);
     const emoji = CATEGORY_EMOJI[colorKind];
+    const isTextOrder = order === "Start" || order === "End";
     // 라벨이 겹쳐서 옆으로 밀리더라도, 정확한 좌표에는 항상 작은 핀이 고정으로 찍혀 있는다
     // (구글맵처럼 "정확한 지점"과 "읽기 편한 이름표"를 분리). 핀 안의 숫자는 방문 순서로,
     // 카드 목록의 같은 번호와 매칭된다 — 브랜드명은 그대로 다 보이니 번호만 있는 마커와는 다르다.
+    // 동선의 시작/끝 지점은 숫자 대신 Start/End로 표시해 한눈에 구분되게 한다.
     const html =
       '<div class="map-label-wrap">' +
       '<div class="map-pin-dot ' +
       colorKind +
       (isDone ? " done" : "") +
+      (isTextOrder ? " pin-text" : "") +
       '">' +
       order +
       "</div>" +
