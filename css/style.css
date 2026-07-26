@@ -400,6 +400,34 @@ button {
   letter-spacing: 0.02em;
 }
 
+.map-label-order {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-blue);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1;
+}
+.map-label-order.wife {
+  background: var(--color-orange);
+}
+.map-label-order.food {
+  background: var(--color-red);
+}
+.map-label-order.pin-text {
+  width: auto;
+  height: 15px;
+  padding: 0 5px;
+  border-radius: var(--radius-pill);
+  font-size: 8px;
+}
+
 .map-label {
   position: absolute;
   left: 0;

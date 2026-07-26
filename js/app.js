@@ -19,7 +19,6 @@
   };
 
   const CATEGORY_LABEL = { mine: "내 쇼핑", wife: "와이프 일정", food: "식당" };
-  const CATEGORY_EMOJI = { mine: "🔵", wife: "🟠", food: "🔴" };
 
   // 쇼핑(내 것/와이프 것)과 별개로 "식당"은 항상 세 번째 색으로 구분해서 보여준다
   function getColorKind(place) {
@@ -1136,12 +1135,13 @@
   function addPlaceLabel(place, order) {
     const isDone = !!state.donePlaces[place.id];
     const colorKind = getColorKind(place);
-    const emoji = CATEGORY_EMOJI[colorKind];
     const isTextOrder = order === "Start" || order === "End";
     // 라벨이 겹쳐서 옆으로 밀리더라도, 정확한 좌표에는 항상 작은 핀이 고정으로 찍혀 있는다
     // (구글맵처럼 "정확한 지점"과 "읽기 편한 이름표"를 분리). 핀 안의 숫자는 방문 순서로,
     // 카드 목록의 같은 번호와 매칭된다 — 브랜드명은 그대로 다 보이니 번호만 있는 마커와는 다르다.
     // 동선의 시작/끝 지점은 숫자 대신 Start/End로 표시해 한눈에 구분되게 한다.
+    // 이름표 옆의 동그라미도 색상만이 아니라 같은 순번을 보여줘서, 라벨이 핀에서
+    // 떨어져 있어도(겹침 방지로 옆으로 밀렸을 때) 몇 번째 방문지인지 바로 알 수 있게 한다.
     const html =
       '<div class="map-label-wrap">' +
       '<div class="map-pin-dot ' +
@@ -1157,8 +1157,12 @@
       '" data-place-id="' +
       place.id +
       '">' +
-      emoji +
-      " " +
+      '<span class="map-label-order ' +
+      colorKind +
+      (isTextOrder ? " pin-text" : "") +
+      '">' +
+      order +
+      "</span> " +
       escapeHtml(place.name) +
       "</div></div>";
 
