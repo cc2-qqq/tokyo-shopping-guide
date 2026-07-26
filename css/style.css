@@ -533,6 +533,12 @@ button {
   transform-origin: 0 0;
 }
 
+.map-hotel-marker {
+  position: relative;
+  width: 34px;
+  height: 34px;
+}
+
 .map-label-hotel {
   display: flex;
   align-items: center;
@@ -544,6 +550,22 @@ button {
   border: 3px solid #fff;
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
   font-size: 16px;
+}
+
+.map-hotel-start-pill {
+  position: absolute;
+  left: 50%;
+  top: 38px;
+  transform: translateX(-50%);
+  background: #1c1c1e;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 }
 
 .route-chip {

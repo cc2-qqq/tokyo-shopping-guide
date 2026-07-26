@@ -786,10 +786,10 @@
 
     const hotelCoords = TRIP_DATA.meta.hotelCoords;
 
-    // 숙소 마커
+    // 숙소 마커 — 오늘 동선의 실제 출발점이므로 Start 라벨을 붙인다
     const hotelIcon = L.divIcon({
       className: "",
-      html: '<div class="map-label-hotel">🏨</div>',
+      html: '<div class="map-hotel-marker"><div class="map-label-hotel">🏨</div><div class="map-hotel-start-pill">Start</div></div>',
       iconSize: [34, 34],
       iconAnchor: [17, 17],
     });
@@ -813,11 +813,8 @@
     const bounds = [hotelCoords];
     day.places.forEach((place, idx) => {
       bounds.push(place.coords);
-      let orderLabel = String(idx + 1);
-      if (day.places.length > 1) {
-        if (idx === 0) orderLabel = "Start";
-        else if (idx === day.places.length - 1) orderLabel = "End";
-      }
+      // 숙소가 Start이므로, 장소들의 마지막 한 곳만 End로 표시하고 나머지는 순번 그대로
+      const orderLabel = idx === day.places.length - 1 ? "End" : String(idx + 1);
       addPlaceLabel(place, orderLabel);
     });
 
