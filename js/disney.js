@@ -5,6 +5,11 @@
  * DISNEY_DATA(js/disneyData.js)를 유일한 데이터 소스로 사용한다.
  * 길찾기는 파크 내부 보행로 데이터가 없어 직선거리 기준 추정치이며,
  * 화면에 항상 "실제 동선과 다를 수 있음"을 함께 표시한다.
+ *
+ * 화장실/베이비/충전/휴식/응급시설은 공식적으로 검증 가능한 좌표 출처가
+ * 없어 DISNEY_DATA에 아직 데이터가 없다 — 이 카테고리들은 UI(칩, 화장실
+ * 찾기 버튼)는 갖춰두되, 실제로는 항상 "확인 필요" 상태로 우아하게
+ * 처리한다(추측 좌표를 만들어 넣지 않는다).
  * ============================================================================
  */
 (function () {
@@ -16,25 +21,49 @@
     memos: "tokyoGuide.disney.memos.v1",
   };
 
-  const CATEGORY_ICON = { attraction: "🎢", restaurant: "🍽️", shop: "🛍️" };
-  const CATEGORY_LABEL = { attraction: "어트랙션", restaurant: "레스토랑", shop: "샵" };
+  const CATEGORY_ICON = { attraction: "🎢", restaurant: "🍽️", shop: "🛍️", restroom: "🚻" };
+  const CATEGORY_LABEL = { attraction: "어트랙션", restaurant: "레스토랑", shop: "샵", restroom: "화장실" };
   const WALK_SPEED_MPS = 1.2; // 파크 혼잡도를 감안해 평균 보행속도보다 여유 있게 잡음
+
+  // 지도/목록 필터에 노출하는 전체 카테고리 목록. AVAILABLE에 없는 카테고리는
+  // 칩은 보이되 항상 "준비 중" 상태로 취급한다(추측 데이터 금지).
+  const CATEGORIES = [
+    { id: "all", icon: "🗺️", label: "전체" },
+    { id: "attraction", icon: "🎢", label: "어트랙션" },
+    { id: "restroom", icon: "🚻", label: "화장실" },
+    { id: "restaurant", icon: "🍴", label: "음식" },
+    { id: "shop", icon: "🛍", label: "숍" },
+    { id: "baby", icon: "👶", label: "베이비" },
+    { id: "charging", icon: "🔋", label: "충전" },
+    { id: "rest", icon: "🪑", label: "휴식" },
+    { id: "emergency", icon: "➕", label: "응급시설" },
+  ];
+  const AVAILABLE_CATEGORIES = ["attraction", "restaurant", "shop"];
+  const SORT_LABEL = { distance: "거리순", area: "구역별", name: "가나다순", rating: "평점순" };
+  const COMPASS_KO = ["북", "북동", "동", "남동", "남", "남서", "서", "북서"];
 
   const state = {
     map: null,
-    markers: {},
+    clusterGroup: null,
+    categoryMarkers: {},
+    favoriteMarkersLayer: null,
+    destinationMarker: null,
+    userMarkerLayer: null,
     favorites: {},
     completed: {},
     memos: {},
     userLocation: null,
     watchId: null,
     headingSupported: false,
+    activeCategory: null,
     activeTab: "list",
-    sheetSort: "area",
-    sheetExpanded: false,
+    sheetSort: "distance",
+    sheetState: "collapsed", // collapsed | half | expanded
     routeTargetId: null,
     routeLine: null,
-    userMarkerLayer: null,
+    navigationMode: false,
+    showRestroomsAlongRoute: false,
+    pickLocationMode: false,
   };
 
   const dom = {};
@@ -46,24 +75,31 @@
     cacheDom();
     loadStorage();
     initMap();
-    renderMarkers();
-    renderQuickFind();
+    renderCategoryBar();
+    renderCategoryMarkers();
+    renderFavoriteMarkers();
     renderSheetTabs();
     renderSheetContent();
+    applySheetState("collapsed", { silent: true });
     bindEvents();
   }
 
   function cacheDom() {
     dom.searchInput = document.getElementById("disneySearchInput");
     dom.searchResults = document.getElementById("disneySearchResults");
-    dom.quickFind = document.getElementById("disneyQuickFind");
-    dom.routeBar = document.getElementById("disneyRouteBar");
+    dom.categoryBar = document.getElementById("disneyCategoryBar");
+    dom.mapWrap = document.querySelector(".disney-map-wrap");
+    dom.restroomFab = document.getElementById("disneyRestroomFab");
+    dom.locationFallback = document.getElementById("disneyLocationFallback");
     dom.sheet = document.getElementById("disneySheet");
     dom.sheetHandle = document.getElementById("disneySheetHandle");
     dom.sheetTabs = document.getElementById("disneySheetTabs");
     dom.sheetContent = document.getElementById("disneySheetContent");
     dom.detailOverlay = document.getElementById("disneyDetailOverlay");
     dom.detailSheet = document.getElementById("disneyDetailSheet");
+    dom.restroomOverlay = document.getElementById("disneyRestroomOverlay");
+    dom.restroomSheet = document.getElementById("disneyRestroomSheet");
+    dom.locateBtn = document.getElementById("disneyLocateBtn");
     dom.toast = document.getElementById("toast");
   }
 
@@ -98,6 +134,20 @@
   function findFacility(id) {
     return getFacilities().find((f) => f.id === id) || null;
   }
+  function getOrigin() {
+    return state.userLocation || DISNEY_DATA.disneyland.coords;
+  }
+
+  // 현재 활성 카테고리 기준으로 걸러진 시설 목록 — 지도 마커와 목록 탭이 공유한다.
+  // 카테고리를 아무것도 선택하지 않은 기본 화면에서는 아무 것도 반환하지
+  // 않는다(현재 위치/즐겨찾기/목적지만 보이는 게 이번 개편의 핵심 목표).
+  function getCategoryFilteredFacilities() {
+    const cat = state.activeCategory;
+    if (!cat) return [];
+    if (cat === "all") return getFacilities();
+    if (AVAILABLE_CATEGORIES.indexOf(cat) !== -1) return getFacilities().filter((f) => f.category === cat);
+    return []; // 아직 데이터가 없는 카테고리(화장실/베이비/충전/휴식/응급시설)
+  }
 
   // ---------------------------------------------------------------------
   // Map
@@ -113,50 +163,118 @@
       subdomains: "abcd",
     }).addTo(state.map);
     L.control.zoom({ position: "bottomright" }).addTo(state.map);
-    state.userMarkerLayer = L.layerGroup().addTo(state.map);
-  }
 
-  function renderMarkers() {
-    getFacilities().forEach((facility) => {
-      const isDone = !!state.completed[facility.id];
-      const icon = L.divIcon({
-        className: "",
-        html:
-          '<div class="disney-marker ' +
-          facility.category +
-          (isDone ? " done" : "") +
-          '"><span>' +
-          CATEGORY_ICON[facility.category] +
-          "</span></div>",
-        iconSize: [30, 30],
-        iconAnchor: [15, 30],
-      });
-      const marker = L.marker(facility.coords, { icon: icon });
-      marker.on("click", () => openDetail(facility.id));
-      marker.addTo(state.map);
-      state.markers[facility.id] = marker;
+    state.clusterGroup = L.markerClusterGroup({ maxClusterRadius: 55, spiderfyOnMaxZoom: true, showCoverageOnHover: false });
+    state.map.addLayer(state.clusterGroup);
+    state.favoriteMarkersLayer = L.layerGroup().addTo(state.map);
+    state.userMarkerLayer = L.layerGroup().addTo(state.map);
+
+    state.map.on("click", (e) => {
+      if (!state.pickLocationMode) return;
+      state.pickLocationMode = false;
+      state.userLocation = [e.latlng.lat, e.latlng.lng];
+      renderUserLocationMarker(state.userLocation, null);
+      showToast("현재 위치가 지정됐어요");
+      if (state.routeTargetId) drawRoute();
+      else refreshDistanceDependentUI();
     });
   }
 
-  function updateMarkerState(id) {
-    const marker = state.markers[id];
-    if (!marker) return;
-    const el = marker.getElement();
-    if (!el) return;
-    const inner = el.querySelector(".disney-marker");
-    if (inner) inner.classList.toggle("done", !!state.completed[id]);
+  function buildFacilityMarker(facility, opts) {
+    opts = opts || {};
+    const isDone = !!state.completed[facility.id];
+    const isFav = !!state.favorites[facility.id];
+    const size = opts.large ? 46 : 30;
+    const icon = L.divIcon({
+      className: "",
+      html:
+        '<div class="disney-marker ' +
+        facility.category +
+        (isDone ? " done" : "") +
+        (opts.large ? " large" : "") +
+        (opts.favorite && isFav ? " favorite" : "") +
+        '"><span>' +
+        CATEGORY_ICON[facility.category] +
+        "</span></div>",
+      iconSize: [size, size],
+      iconAnchor: [size / 2, size],
+    });
+    const marker = L.marker(facility.coords, { icon: icon });
+    marker.on("click", () => openDetail(facility.id));
+    return marker;
+  }
+
+  // 카테고리로 걸러진(즐겨찾기 제외 — 중복 표시 방지) 시설만 클러스터에 올린다.
+  function renderCategoryMarkers() {
+    state.clusterGroup.clearLayers();
+    state.categoryMarkers = {};
+    const facilities = getCategoryFilteredFacilities().filter((f) => !state.favorites[f.id]);
+    facilities.forEach((f) => {
+      const marker = buildFacilityMarker(f);
+      state.clusterGroup.addLayer(marker);
+      state.categoryMarkers[f.id] = marker;
+    });
+  }
+
+  // 즐겨찾기는 카테고리 선택과 무관하게 항상 지도에 표시(클러스터에 안 묶임)
+  function renderFavoriteMarkers() {
+    state.favoriteMarkersLayer.clearLayers();
+    Object.keys(state.favorites)
+      .filter((id) => state.favorites[id])
+      .forEach((id) => {
+        const f = findFacility(id);
+        if (!f) return;
+        buildFacilityMarker(f, { favorite: true }).addTo(state.favoriteMarkersLayer);
+      });
+  }
+
+  function renderDestinationMarker() {
+    if (state.destinationMarker) {
+      state.map.removeLayer(state.destinationMarker);
+      state.destinationMarker = null;
+    }
+    if (!state.routeTargetId) return;
+    const f = findFacility(state.routeTargetId);
+    if (!f) return;
+    state.destinationMarker = buildFacilityMarker(f, { large: true }).addTo(state.map);
   }
 
   function focusFacility(id) {
     const facility = findFacility(id);
     if (!facility) return;
     state.map.setView(facility.coords, 18, { animate: true });
-    Object.keys(state.markers).forEach((mid) => {
-      const el = state.markers[mid].getElement();
-      if (!el) return;
-      const inner = el.querySelector(".disney-marker");
-      if (inner) inner.classList.toggle("active", mid === id);
-    });
+  }
+
+  // ---------------------------------------------------------------------
+  // 카테고리 필터 칩
+  // ---------------------------------------------------------------------
+  function renderCategoryBar() {
+    dom.categoryBar.innerHTML = CATEGORIES.map((c) => {
+      const isActive = state.activeCategory === c.id;
+      const unavailable = c.id !== "all" && AVAILABLE_CATEGORIES.indexOf(c.id) === -1;
+      return (
+        '<button type="button" class="disney-chip' +
+        (isActive ? " active" : "") +
+        (unavailable ? " unavailable" : "") +
+        '" data-category="' +
+        c.id +
+        '">' +
+        c.icon +
+        " " +
+        c.label +
+        "</button>"
+      );
+    }).join("");
+  }
+
+  function selectCategory(catId) {
+    state.activeCategory = state.activeCategory === catId ? null : catId;
+    renderCategoryBar();
+    renderCategoryMarkers();
+    if (state.activeCategory && AVAILABLE_CATEGORIES.indexOf(state.activeCategory) === -1 && state.activeCategory !== "all") {
+      showToast("아직 준비 중인 카테고리예요 · 디즈니 공식 앱에서 확인해주세요");
+    }
+    if (state.activeTab === "list") renderListTab();
   }
 
   // ---------------------------------------------------------------------
@@ -182,6 +300,7 @@
     const isFav = !!state.favorites[f.id];
     const isDone = !!state.completed[f.id];
     const rowClass = kind === "result" ? "disney-result-row" : "disney-list-row" + (isDone ? " done" : "");
+    const dist = haversineMeters(getOrigin(), f.coords);
     return (
       '<div class="' +
       rowClass +
@@ -198,8 +317,12 @@
       "</span>" +
       '<span class="disney-row-meta">' +
       escapeHtml(f.area) +
-      (f.rating ? " · " + "★".repeat(f.rating) : "") +
+      " · " +
+      formatDistance(dist) +
+      " · " +
+      formatWalkTime(dist) +
       "</span></span>" +
+      '<div class="disney-row-actions">' +
       '<button type="button" class="disney-row-fav' +
       (isFav ? " active" : "") +
       '" data-action="toggle-fav" data-facility-id="' +
@@ -207,6 +330,10 @@
       '" aria-label="즐겨찾기">' +
       (isFav ? "♥" : "♡") +
       "</button>" +
+      '<button type="button" class="disney-row-route" data-action="route-to" data-facility-id="' +
+      f.id +
+      '" aria-label="길찾기">🧭</button>' +
+      "</div>" +
       "</div>"
     );
   }
@@ -235,17 +362,25 @@
   }
 
   function renderSheetContent() {
+    if (state.navigationMode) return; // Navigation Mode 중엔 renderNavCard가 sheetContent를 관리
     if (state.activeTab === "list") return renderListTab();
     if (state.activeTab === "favorites") return renderFavoritesTab();
     return renderRouteTab();
   }
 
-  const SORT_LABEL = { area: "구역별", name: "가나다순", rating: "평점순" };
-
   function renderListTab() {
+    if (!state.activeCategory) {
+      dom.sheetContent.innerHTML = '<p class="disney-empty-note">위 카테고리에서 하나를 선택하면<br>목록이 표시돼요</p>';
+      return;
+    }
+    const facilities = getCategoryFilteredFacilities();
+    if (facilities.length === 0) {
+      dom.sheetContent.innerHTML = '<p class="disney-empty-note">이 카테고리는 아직 준비 중이에요<br>디즈니 공식 앱에서 확인해주세요</p>';
+      return;
+    }
     const sortRow =
       '<div class="disney-sheet-sort-row">' +
-      ["area", "name", "rating"]
+      ["distance", "area", "name", "rating"]
         .map(
           (s) =>
             '<button type="button" class="disney-sheet-sort-btn' +
@@ -258,11 +393,15 @@
         )
         .join("") +
       "</div>";
-    const items = getFacilities().slice().sort(sorterFor(state.sheetSort));
+    const items = facilities.slice().sort(sorterFor(state.sheetSort));
     dom.sheetContent.innerHTML = sortRow + items.map((f) => buildRowHtml(f, "list")).join("");
   }
 
   function sorterFor(sort) {
+    if (sort === "distance") {
+      const origin = getOrigin();
+      return (a, b) => haversineMeters(origin, a.coords) - haversineMeters(origin, b.coords);
+    }
     if (sort === "name") return (a, b) => a.name.localeCompare(b.name, "ko");
     if (sort === "rating") return (a, b) => (b.rating || 0) - (a.rating || 0);
     return (a, b) => a.area.localeCompare(b.area, "ko") || a.name.localeCompare(b.name, "ko");
@@ -314,7 +453,7 @@
   // 가장 가까운 미방문 지점을 계속 골라 잇는 최근접 이웃 휴리스틱 —
   // 실제 최단 경로 보장은 아니고 직선거리 기준의 "합리적인 순서" 추정치
   function computeNearestNeighborRoute(items) {
-    const start = state.userLocation || DISNEY_DATA.disneyland.coords;
+    const start = getOrigin();
     const remaining = items.slice();
     const order = [];
     let current = start;
@@ -343,6 +482,10 @@
     return "도보 약 " + minutes + "분";
   }
 
+  function refreshDistanceDependentUI() {
+    if (state.activeTab === "list" && !state.navigationMode) renderListTab();
+  }
+
   // ---------------------------------------------------------------------
   // 시설 상세 바텀시트
   // ---------------------------------------------------------------------
@@ -353,6 +496,7 @@
     const isFav = !!state.favorites[id];
     const isDone = !!state.completed[id];
     const memoText = state.memos[id] || "";
+    const dist = haversineMeters(getOrigin(), f.coords);
 
     dom.detailSheet.innerHTML =
       '<div class="disney-detail-header">' +
@@ -380,6 +524,11 @@
       "</div>" +
       (f.description ? '<p class="disney-detail-desc">' + escapeHtml(f.description) + "</p>" : "") +
       '<div class="disney-detail-meta-row">' +
+      '<span class="disney-detail-chip">📍 ' +
+      formatDistance(dist) +
+      " · " +
+      formatWalkTime(dist) +
+      "</span>" +
       (f.recommendedTime ? '<span class="disney-detail-chip">⏱ ' + escapeHtml(f.recommendedTime) + "</span>" : "") +
       (f.priceRange ? '<span class="disney-detail-chip">💴 ' + escapeHtml(f.priceRange) + "</span>" : "") +
       (f.rating ? '<span class="disney-detail-chip">' + "★".repeat(f.rating) + "</span>" : "") +
@@ -432,12 +581,15 @@
   function toggleFavorite(id) {
     state.favorites[id] = !state.favorites[id];
     persistFavorites();
+    renderCategoryMarkers();
+    renderFavoriteMarkers();
     refreshAfterStateChange();
   }
   function toggleCompleted(id) {
     state.completed[id] = !state.completed[id];
     persistCompleted();
-    updateMarkerState(id);
+    renderCategoryMarkers();
+    renderFavoriteMarkers();
     refreshAfterStateChange();
   }
   function refreshAfterStateChange() {
@@ -449,171 +601,277 @@
   }
 
   // ---------------------------------------------------------------------
-  // 길찾기 — 직선거리 기준(파크 내부 보행로 데이터가 없어 실제 동선과 다를 수 있음)
+  // 길찾기 / Navigation Mode
+  // 파크 내부 보행로 데이터가 없어 직선거리 기준 추정치이며, 실제 동선과
+  // 다를 수 있음을 항상 함께 표시한다.
   // ---------------------------------------------------------------------
   function routeTo(id) {
     const f = findFacility(id);
     if (!f) return;
     state.routeTargetId = id;
     closeDetail();
+    closeRestroomFinder();
+    enterNavigationMode();
     drawRoute();
+  }
+
+  function enterNavigationMode() {
+    if (state.navigationMode) return;
+    state.navigationMode = true;
+    state.map.removeLayer(state.clusterGroup);
+    state.map.removeLayer(state.favoriteMarkersLayer);
+    dom.sheetTabs.innerHTML = "";
+    applySheetState("collapsed");
+  }
+
+  function exitNavigationMode() {
+    state.navigationMode = false;
+    state.map.addLayer(state.clusterGroup);
+    state.map.addLayer(state.favoriteMarkersLayer);
+    renderSheetTabs();
+    renderSheetContent();
   }
 
   function drawRoute() {
     const f = findFacility(state.routeTargetId);
     if (!f) return;
-    const origin = state.userLocation || DISNEY_DATA.disneyland.coords;
+    const origin = getOrigin();
 
-    if (state.routeLine) {
-      state.map.removeLayer(state.routeLine);
-    }
+    if (state.routeLine) state.map.removeLayer(state.routeLine);
     state.routeLine = L.polyline([origin, f.coords], {
       color: "#007AFF",
-      weight: 4,
-      dashArray: "8 8",
-      opacity: 0.85,
+      weight: 6,
+      opacity: 0.9,
+      lineCap: "round",
     }).addTo(state.map);
-    state.map.fitBounds([origin, f.coords], { padding: [60, 60] });
+    renderDestinationMarker();
+    state.map.fitBounds([origin, f.coords], { padding: [70, 70] });
 
+    renderNavCard();
+  }
+
+  function renderNavCard() {
+    const f = findFacility(state.routeTargetId);
+    if (!f) return;
+    const origin = getOrigin();
     const distance = haversineMeters(origin, f.coords);
-    dom.routeBar.hidden = false;
-    dom.routeBar.innerHTML =
-      '<div class="disney-route-top"><span class="disney-route-name">🧭 ' +
+    const directionText = state.userLocation
+      ? "현재 위치 기준 " + bearingToCompassKo(computeBearing(origin, f.coords)) + "쪽 방향"
+      : "위치를 켜면 방향 안내가 표시돼요";
+
+    dom.sheetContent.innerHTML =
+      '<div class="disney-nav-card">' +
+      '<p class="disney-nav-title">🧭 ' +
       escapeHtml(f.name) +
-      "</span>" +
-      '<button type="button" class="disney-route-close" id="disneyRouteCloseBtn" aria-label="경로 닫기">✕</button></div>' +
-      '<div class="disney-route-meta"><strong>' +
+      "</p>" +
+      '<div class="disney-nav-meta"><strong>' +
       formatWalkTime(distance) +
       "</strong><span>" +
       formatDistance(distance) +
       "</span></div>" +
-      '<div class="disney-route-warn">' +
-      (state.userLocation
-        ? "직선거리 기준 추정치예요, 실제 동선과 다를 수 있어요"
-        : "위치를 켜면 현재 위치 기준으로 더 정확하게 안내돼요") +
+      '<p class="disney-nav-direction">' +
+      directionText +
+      " · 직선거리 추정치라 실제 동선과 다를 수 있어요</p>" +
+      '<label class="disney-nav-toggle"><input type="checkbox" id="disneyRestroomAlongRouteToggle"' +
+      (state.showRestroomsAlongRoute ? " checked" : "") +
+      " /> 경로 주변 화장실 표시</label>" +
+      '<div class="disney-nav-actions"><button type="button" class="btn btn-outline" id="disneyEndNavBtn">길찾기 종료</button></div>' +
       "</div>";
 
-    document.getElementById("disneyRouteCloseBtn").addEventListener("click", closeRoute);
+    document.getElementById("disneyEndNavBtn").addEventListener("click", closeRoute);
+    document.getElementById("disneyRestroomAlongRouteToggle").addEventListener("change", (e) => {
+      state.showRestroomsAlongRoute = e.target.checked;
+      if (state.showRestroomsAlongRoute) {
+        const nearby = getFacilities().filter((fac) => fac.category === "restroom");
+        showToast(nearby.length ? "경로 주변 화장실을 표시했어요" : "경로 주변에 확인된 화장실 정보가 아직 없어요");
+      }
+    });
   }
 
   function closeRoute() {
     state.routeTargetId = null;
+    state.showRestroomsAlongRoute = false;
     if (state.routeLine) {
       state.map.removeLayer(state.routeLine);
       state.routeLine = null;
     }
-    dom.routeBar.hidden = true;
-    dom.routeBar.innerHTML = "";
+    renderDestinationMarker();
+    exitNavigationMode();
+  }
+
+  // 두 좌표 사이의 방위각(0=북, 시계방향)을 구해 8방위 한글 표현으로 변환.
+  // 실내 보행로를 모르니 "정확한 다음 코너"가 아니라 대략적인 진행 방향만 안내한다.
+  function computeBearing(from, to) {
+    const lat1 = (from[0] * Math.PI) / 180;
+    const lat2 = (to[0] * Math.PI) / 180;
+    const dLng = ((to[1] - from[1]) * Math.PI) / 180;
+    const y = Math.sin(dLng) * Math.cos(lat2);
+    const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+    return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+  }
+  function bearingToCompassKo(brng) {
+    return COMPASS_KO[Math.round(brng / 45) % 8];
   }
 
   // ---------------------------------------------------------------------
-  // Quick Find — 검증된 카테고리(어트랙션/레스토랑/샵)만 제공
+  // 가장 가까운 화장실 (데이터가 없으면 우아하게 "확인 필요" 상태로 안내)
   // ---------------------------------------------------------------------
-  const QUICK_FIND_BUTTONS = [
-    {
-      id: "attraction-top",
-      icon: "🎢",
-      label: "인기 어트랙션",
-      filter: (f) => f.category === "attraction" && (f.rating || 0) >= 4,
-    },
-    { id: "restaurant", icon: "🍽️", label: "레스토랑", filter: (f) => f.category === "restaurant" },
-    { id: "shop", icon: "🛍️", label: "샵", filter: (f) => f.category === "shop" },
-  ];
+  function openRestroomFinder() {
+    const origin = getOrigin();
+    const restrooms = getFacilities().filter((f) => f.category === "restroom");
 
-  function renderQuickFind() {
-    dom.quickFind.innerHTML =
-      QUICK_FIND_BUTTONS.map(
-        (q) =>
-          '<button type="button" class="disney-quickfind-btn" data-quickfind="' +
-          q.id +
-          '" aria-label="' +
-          q.label +
-          '" title="' +
-          q.label +
-          '">' +
-          q.icon +
-          "</button>"
-      ).join("") +
-      '<button type="button" class="disney-quickfind-btn" id="disneyLocateBtn" aria-label="현재 위치" title="현재 위치">🎯</button>';
-  }
-
-  function handleQuickFind(qid) {
-    const config = QUICK_FIND_BUTTONS.find((q) => q.id === qid);
-    if (!config) return;
-    const candidates = getFacilities().filter((f) => config.filter(f) && !state.completed[f.id]);
-    if (candidates.length === 0) {
-      showToast("조건에 맞는 시설이 없어요");
+    if (restrooms.length === 0) {
+      dom.restroomSheet.innerHTML =
+        '<div class="disney-restroom-empty">' +
+        '<p class="disney-detail-name">🚻 화장실 정보 준비 중</p>' +
+        '<p class="disney-detail-desc">화장실 위치는 구글맵이나 공식 사이트에서 개별 검증할 수 있는 출처가 없어 이 지도에는 아직 표시하지 않고 있어요. 정확한 위치는 파크 내 안내도나 디즈니 공식 앱에서 확인해주세요.</p>' +
+        '<a class="btn btn-primary" href="https://www.tokyodisneyresort.jp/tdl/" target="_blank" rel="noopener">디즈니 공식 사이트 열기</a>' +
+        "</div>";
+      dom.restroomOverlay.classList.add("show");
       return;
     }
-    const origin = state.userLocation || DISNEY_DATA.disneyland.coords;
-    let best = candidates[0];
-    let bestDist = haversineMeters(origin, best.coords);
-    candidates.forEach((f) => {
-      const d = haversineMeters(origin, f.coords);
-      if (d < bestDist) {
-        bestDist = d;
-        best = f;
-      }
-    });
-    routeTo(best.id);
+
+    const nearest = restrooms
+      .slice()
+      .sort((a, b) => haversineMeters(origin, a.coords) - haversineMeters(origin, b.coords))
+      .slice(0, 3);
+    dom.restroomSheet.innerHTML =
+      '<p class="disney-detail-name">🚻 가까운 화장실</p>' + nearest.map((r) => buildRestroomRowHtml(r, origin)).join("");
+    dom.restroomOverlay.classList.add("show");
+    routeTo(nearest[0].id);
+  }
+
+  function restroomFlag(v) {
+    return v === true ? "✅" : v === false ? "❌" : "확인 필요";
+  }
+
+  function buildRestroomRowHtml(r, origin) {
+    const dist = haversineMeters(origin, r.coords);
+    return (
+      '<div class="disney-restroom-row">' +
+      '<p class="disney-detail-name" style="font-size:15px;">' +
+      escapeHtml(r.name) +
+      "</p>" +
+      '<p class="disney-detail-area">' +
+      escapeHtml(r.area) +
+      " · " +
+      formatDistance(dist) +
+      " · " +
+      formatWalkTime(dist) +
+      "</p>" +
+      '<div class="disney-detail-meta-row">' +
+      '<span class="disney-detail-chip">다목적 ' +
+      restroomFlag(r.multiPurpose) +
+      "</span>" +
+      '<span class="disney-detail-chip">기저귀교환대 ' +
+      restroomFlag(r.diaperChanging) +
+      "</span>" +
+      '<span class="disney-detail-chip">어린이용 ' +
+      restroomFlag(r.kidsFacility) +
+      "</span>" +
+      '<span class="disney-detail-chip">베이비센터 인접 ' +
+      restroomFlag(r.nearBabyCenter) +
+      "</span>" +
+      "</div>" +
+      '<button type="button" class="btn btn-primary" data-action="route-to" data-facility-id="' +
+      r.id +
+      '" style="margin-top:10px;width:100%;">🧭 길찾기</button>' +
+      "</div>"
+    );
+  }
+
+  function closeRestroomFinder() {
+    dom.restroomOverlay.classList.remove("show");
   }
 
   // ---------------------------------------------------------------------
-  // 현재 위치 — 실시간 추적 + 경로 갱신
+  // 현재 위치 — 실시간 추적 + 경로 갱신 + 권한 거부 시 대안 제공
   // ---------------------------------------------------------------------
   function toggleGeolocation() {
-    const btn = document.getElementById("disneyLocateBtn");
     if (state.watchId != null) {
       navigator.geolocation.clearWatch(state.watchId);
       state.watchId = null;
       state.userLocation = null;
       state.userMarkerLayer.clearLayers();
-      btn.classList.remove("locate-active");
+      dom.locateBtn.classList.remove("locate-active");
       if (state.routeTargetId) drawRoute();
+      refreshDistanceDependentUI();
       return;
     }
     if (!navigator.geolocation) {
       showToast("이 브라우저에서는 위치 확인을 지원하지 않아요");
+      showLocationFallback();
       return;
     }
-    btn.classList.add("locate-active");
+    dom.locateBtn.classList.add("locate-active");
     maybeRequestOrientationPermission();
     let firstFix = true;
     state.watchId = navigator.geolocation.watchPosition(
       (pos) => {
+        hideLocationFallback();
         state.userLocation = [pos.coords.latitude, pos.coords.longitude];
-        renderUserLocationDot(pos);
+        renderUserLocationMarker(state.userLocation, pos.coords.accuracy || 30);
         if (firstFix) {
           state.map.setView(state.userLocation, 17);
           firstFix = false;
         }
         if (state.routeTargetId) drawRoute();
+        refreshDistanceDependentUI();
       },
       (err) => {
-        btn.classList.remove("locate-active");
+        dom.locateBtn.classList.remove("locate-active");
         state.watchId = null;
         const messages = {
-          1: "위치 권한이 꺼져 있어요. 브라우저 설정에서 위치 접근을 허용해주세요.",
+          1: "위치 권한이 꺼져 있어요.",
           2: "현재 위치를 확인할 수 없어요.",
-          3: "위치 확인이 너무 오래 걸려요. 다시 시도해주세요.",
+          3: "위치 확인이 너무 오래 걸려요.",
         };
         showToast(messages[err.code] || "위치 확인에 실패했어요");
+        showLocationFallback();
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
     );
   }
 
-  function renderUserLocationDot(pos) {
+  // 위치 권한이 없거나 실패했을 때도 화면이 멈추지 않도록 항상 3가지 대안을 준다.
+  function showLocationFallback() {
+    dom.locationFallback.hidden = false;
+    dom.locationFallback.innerHTML =
+      '<p class="disney-fallback-text">현재 위치를 확인할 수 없어요</p>' +
+      '<div class="disney-fallback-actions">' +
+      '<button type="button" class="btn btn-outline" id="fallbackEntranceBtn">파크 입구에서 시작</button>' +
+      '<button type="button" class="btn btn-outline" id="fallbackPickBtn">지도에서 직접 선택</button>' +
+      '<button type="button" class="btn btn-primary" id="fallbackRetryBtn">위치 권한 다시 요청</button>' +
+      "</div>";
+    document.getElementById("fallbackEntranceBtn").addEventListener("click", () => {
+      state.userLocation = DISNEY_DATA.disneyland.coords;
+      hideLocationFallback();
+      showToast("파크 입구(중앙) 기준으로 안내할게요");
+      if (state.routeTargetId) drawRoute();
+      refreshDistanceDependentUI();
+    });
+    document.getElementById("fallbackPickBtn").addEventListener("click", () => {
+      state.pickLocationMode = true;
+      hideLocationFallback();
+      showToast("지도를 눌러 현재 위치를 선택해주세요");
+    });
+    document.getElementById("fallbackRetryBtn").addEventListener("click", () => {
+      hideLocationFallback();
+      toggleGeolocation();
+    });
+  }
+  function hideLocationFallback() {
+    dom.locationFallback.hidden = true;
+    dom.locationFallback.innerHTML = "";
+  }
+
+  function renderUserLocationMarker(latlng, accuracy) {
     state.userMarkerLayer.clearLayers();
-    const latlng = [pos.coords.latitude, pos.coords.longitude];
-    const accuracy = pos.coords.accuracy || 30;
-    L.circle(latlng, {
-      radius: accuracy,
-      color: "#007AFF",
-      weight: 1,
-      fillColor: "#007AFF",
-      fillOpacity: 0.12,
-    }).addTo(state.userMarkerLayer);
+    if (accuracy) {
+      L.circle(latlng, { radius: accuracy, color: "#007AFF", weight: 1, fillColor: "#007AFF", fillOpacity: 0.12 }).addTo(
+        state.userMarkerLayer
+      );
+    }
     const headingHtml = state.headingSupported
       ? '<div class="user-location-heading" id="disneyHeadingArrow">▲</div>'
       : "";
@@ -655,24 +913,104 @@
   }
 
   // ---------------------------------------------------------------------
+  // 드래그 가능한 바텀시트 — collapsed(30%) / half(55%) / expanded(78%)
+  // ---------------------------------------------------------------------
+  const SHEET_RATIOS = { collapsed: 0.3, half: 0.55, expanded: 0.78 };
+  let dragCtx = null;
+
+  function getSheetAvailableHeight() {
+    return dom.mapWrap.getBoundingClientRect().height + dom.sheet.getBoundingClientRect().height;
+  }
+
+  function applySheetState(newState, opts) {
+    opts = opts || {};
+    state.sheetState = newState;
+    const available = getSheetAvailableHeight();
+    const px = Math.round(available * SHEET_RATIOS[newState]);
+    if (opts.silent) {
+      dom.sheet.classList.add("dragging");
+      dom.sheet.style.height = px + "px";
+      void dom.sheet.offsetWidth;
+      dom.sheet.classList.remove("dragging");
+    } else {
+      dom.sheet.style.height = px + "px";
+    }
+  }
+
+  function nearestSheetState(px, available) {
+    let best = "collapsed";
+    let bestDiff = Infinity;
+    Object.keys(SHEET_RATIOS).forEach((key) => {
+      const target = available * SHEET_RATIOS[key];
+      const diff = Math.abs(target - px);
+      if (diff < bestDiff) {
+        bestDiff = diff;
+        best = key;
+      }
+    });
+    return best;
+  }
+
+  function cycleSheetState() {
+    const order = ["collapsed", "half", "expanded"];
+    const next = order[(order.indexOf(state.sheetState) + 1) % order.length];
+    applySheetState(next);
+  }
+
+  function bindSheetDrag() {
+    dom.sheetHandle.addEventListener("pointerdown", (e) => {
+      dragCtx = {
+        startY: e.clientY,
+        startHeight: dom.sheet.getBoundingClientRect().height,
+        moved: false,
+        available: getSheetAvailableHeight(),
+      };
+      dom.sheet.classList.add("dragging");
+      dom.sheetHandle.setPointerCapture(e.pointerId);
+    });
+    dom.sheetHandle.addEventListener("pointermove", (e) => {
+      if (!dragCtx) return;
+      const deltaY = dragCtx.startY - e.clientY;
+      if (Math.abs(deltaY) > 4) dragCtx.moved = true;
+      const minPx = dragCtx.available * SHEET_RATIOS.collapsed;
+      const maxPx = dragCtx.available * SHEET_RATIOS.expanded;
+      const next = Math.min(maxPx, Math.max(minPx, dragCtx.startHeight + deltaY));
+      dom.sheet.style.height = next + "px";
+    });
+    const endDrag = (e) => {
+      if (!dragCtx) return;
+      dom.sheet.classList.remove("dragging");
+      if (!dragCtx.moved) {
+        cycleSheetState();
+      } else {
+        const currentPx = dom.sheet.getBoundingClientRect().height;
+        applySheetState(nearestSheetState(currentPx, dragCtx.available));
+      }
+      dragCtx = null;
+    };
+    dom.sheetHandle.addEventListener("pointerup", endDrag);
+    dom.sheetHandle.addEventListener("pointercancel", endDrag);
+  }
+
+  // ---------------------------------------------------------------------
   // Events
   // ---------------------------------------------------------------------
   function bindEvents() {
     dom.searchInput.addEventListener("input", handleSearchInput);
+    bindSheetDrag();
 
-    dom.sheetHandle.addEventListener("click", () => {
-      state.sheetExpanded = !state.sheetExpanded;
-      dom.sheet.classList.toggle("expanded", state.sheetExpanded);
+    dom.categoryBar.addEventListener("click", (e) => {
+      const chip = e.target.closest("[data-category]");
+      if (chip) selectCategory(chip.dataset.category);
     });
+
+    dom.restroomFab.addEventListener("click", openRestroomFinder);
 
     dom.sheetTabs.addEventListener("click", (e) => {
       const btn = e.target.closest("[data-tab]");
       if (!btn) return;
       state.activeTab = btn.dataset.tab;
-      if (!state.sheetExpanded) {
-        state.sheetExpanded = true;
-        dom.sheet.classList.add("expanded");
-      }
+      if (state.sheetState === "collapsed") applySheetState("half");
       renderSheetTabs();
       renderSheetContent();
     });
@@ -703,14 +1041,13 @@
         return;
       }
 
-      const quickFindBtn = e.target.closest("[data-quickfind]");
-      if (quickFindBtn) {
-        handleQuickFind(quickFindBtn.dataset.quickfind);
+      if (e.target === dom.locateBtn || e.target.closest("#disneyLocateBtn")) {
+        toggleGeolocation();
         return;
       }
 
-      if (e.target.id === "disneyLocateBtn") {
-        toggleGeolocation();
+      if (e.target === dom.restroomOverlay) {
+        closeRestroomFinder();
         return;
       }
 

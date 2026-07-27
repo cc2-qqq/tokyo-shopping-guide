@@ -24,6 +24,19 @@
       integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
       crossorigin=""
     />
+    <!-- Leaflet.markercluster (마커가 많을 때 자동으로 묶어서 표시) -->
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"
+      integrity="sha384-pmjIAcz2bAn0xukfxADbZIb3t8oRT9Sv0rvO+BR5Csr6Dhqq+nZs59P0pPKQJkEV"
+      crossorigin="anonymous"
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"
+      integrity="sha384-wgw+aLYNQ7dlhK47ZPK7FRACiq7ROZwgFNg0m04avm4CaXS+Z9Y7nMu8yNjBKYC+"
+      crossorigin="anonymous"
+    />
 
     <link rel="stylesheet" href="css/style.css" />
     <link rel="stylesheet" href="css/disney.css" />
@@ -43,17 +56,23 @@
               autocomplete="off"
             />
           </div>
+          <button type="button" class="disney-locate-icon-btn" id="disneyLocateBtn" aria-label="현재 위치">🎯</button>
         </div>
         <div class="disney-search-results" id="disneySearchResults" hidden></div>
 
+        <!-- 카테고리 필터 칩 -->
+        <div class="disney-category-bar" id="disneyCategoryBar"></div>
+
         <!-- 지도 -->
-        <div id="disneyMap" class="disney-map"></div>
+        <div class="disney-map-wrap">
+          <div id="disneyMap" class="disney-map"></div>
 
-        <!-- Quick Find -->
-        <div class="disney-quickfind" id="disneyQuickFind"></div>
+          <!-- 가장 가까운 화장실 Floating Button -->
+          <button type="button" class="disney-restroom-fab" id="disneyRestroomFab">🚻 가장 가까운 화장실</button>
 
-        <!-- 경로 안내 바 -->
-        <div class="disney-route-bar" id="disneyRouteBar" hidden></div>
+          <!-- 위치 확인 실패 시 대안 패널 -->
+          <div class="disney-location-fallback" id="disneyLocationFallback" hidden></div>
+        </div>
 
         <!-- 하단 시트 (목록 / 즐겨찾기 / 추천 동선) -->
         <div class="disney-sheet" id="disneySheet">
@@ -66,6 +85,11 @@
         <div class="disney-detail-overlay" id="disneyDetailOverlay">
           <div class="disney-detail-sheet" id="disneyDetailSheet"></div>
         </div>
+
+        <!-- 화장실 찾기 바텀시트 -->
+        <div class="disney-detail-overlay" id="disneyRestroomOverlay">
+          <div class="disney-detail-sheet" id="disneyRestroomSheet"></div>
+        </div>
       </div>
     </div>
 
@@ -76,6 +100,11 @@
       src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
       integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
       crossorigin=""
+    ></script>
+    <script
+      src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"
+      integrity="sha384-eXVCORTRlv4FUUgS/xmOyr66XBVraen8ATNLMESp92FKXLAMiKkerixTiBvXriZr"
+      crossorigin="anonymous"
     ></script>
 
     <script src="js/utils.js"></script>
