@@ -38,7 +38,7 @@
     { id: "rest", icon: "🪑", label: "휴식" },
     { id: "emergency", icon: "➕", label: "응급시설" },
   ];
-  const AVAILABLE_CATEGORIES = ["attraction", "restaurant", "shop"];
+  const AVAILABLE_CATEGORIES = ["attraction", "restaurant", "shop", "restroom"];
   const SORT_LABEL = { distance: "거리순", area: "구역별", name: "가나다순", rating: "평점순" };
   const COMPASS_KO = ["북", "북동", "동", "남동", "남", "남서", "서", "북서"];
 
@@ -61,6 +61,7 @@
     sheetState: "collapsed", // collapsed | half | expanded
     routeTargetId: null,
     routeLine: null,
+    routeRestroomMarkers: [],
     navigationMode: false,
     showRestroomsAlongRoute: false,
     pickLocationMode: false,
@@ -508,6 +509,7 @@
       '<div class="disney-detail-title-group"><p class="disney-detail-name">' +
       escapeHtml(f.name) +
       (isDone ? '<span class="disney-done-badge">완료</span>' : "") +
+      (f.approximate ? '<span class="disney-approx-badge">근사 위치</span>' : "") +
       "</p>" +
       '<p class="disney-detail-area">' +
       escapeHtml(f.area) +
@@ -605,12 +607,20 @@
   // 파크 내부 보행로 데이터가 없어 직선거리 기준 추정치이며, 실제 동선과
   // 다를 수 있음을 항상 함께 표시한다.
   // ---------------------------------------------------------------------
+  // 사용자가 명시적으로 "길찾기"를 누른 경우 — 열려 있던 상세/화장실 시트를
+  // 닫고 바로 Navigation Mode(안내 카드)로 이동시킨다.
   function routeTo(id) {
+    closeDetail();
+    closeRestroomFinder();
+    startRoute(id);
+  }
+
+  // 화장실 찾기에서 "가장 가까운 곳"을 자동으로 미리 보여줄 때 쓴다 —
+  // 목록 시트는 그대로 열어둔 채 지도/안내 카드만 뒤에서 갱신한다.
+  function startRoute(id) {
     const f = findFacility(id);
     if (!f) return;
     state.routeTargetId = id;
-    closeDetail();
-    closeRestroomFinder();
     enterNavigationMode();
     drawRoute();
   }
@@ -681,16 +691,39 @@
     document.getElementById("disneyEndNavBtn").addEventListener("click", closeRoute);
     document.getElementById("disneyRestroomAlongRouteToggle").addEventListener("change", (e) => {
       state.showRestroomsAlongRoute = e.target.checked;
-      if (state.showRestroomsAlongRoute) {
-        const nearby = getFacilities().filter((fac) => fac.category === "restroom");
-        showToast(nearby.length ? "경로 주변 화장실을 표시했어요" : "경로 주변에 확인된 화장실 정보가 아직 없어요");
-      }
+      toggleRouteRestrooms(state.showRestroomsAlongRoute);
     });
+  }
+
+  // 경로에서 크게 벗어나지 않는(출발지 또는 목적지에서 400m 이내) 화장실만 지도에 얹는다.
+  function toggleRouteRestrooms(show) {
+    state.routeRestroomMarkers.forEach((m) => state.map.removeLayer(m));
+    state.routeRestroomMarkers = [];
+    if (!show) return;
+
+    const dest = findFacility(state.routeTargetId);
+    if (!dest) return;
+    const origin = getOrigin();
+    const nearby = getFacilities()
+      .filter((f) => f.category === "restroom")
+      .filter((r) => Math.min(haversineMeters(origin, r.coords), haversineMeters(dest.coords, r.coords)) <= 400);
+
+    if (nearby.length === 0) {
+      showToast("경로 주변(400m 이내)에 확인된 화장실이 없어요");
+      return;
+    }
+    nearby.forEach((r) => {
+      const marker = buildFacilityMarker(r);
+      marker.addTo(state.map);
+      state.routeRestroomMarkers.push(marker);
+    });
+    showToast(nearby.length + "곳의 화장실을 경로 주변에 표시했어요");
   }
 
   function closeRoute() {
     state.routeTargetId = null;
     state.showRestroomsAlongRoute = false;
+    toggleRouteRestrooms(false);
     if (state.routeLine) {
       state.map.removeLayer(state.routeLine);
       state.routeLine = null;
@@ -738,7 +771,7 @@
     dom.restroomSheet.innerHTML =
       '<p class="disney-detail-name">🚻 가까운 화장실</p>' + nearest.map((r) => buildRestroomRowHtml(r, origin)).join("");
     dom.restroomOverlay.classList.add("show");
-    routeTo(nearest[0].id);
+    startRoute(nearest[0].id);
   }
 
   function restroomFlag(v) {
@@ -751,6 +784,7 @@
       '<div class="disney-restroom-row">' +
       '<p class="disney-detail-name" style="font-size:15px;">' +
       escapeHtml(r.name) +
+      (r.approximate ? '<span class="disney-approx-badge">근사 위치</span>' : "") +
       "</p>" +
       '<p class="disney-detail-area">' +
       escapeHtml(r.area) +
@@ -759,6 +793,9 @@
       " · " +
       formatWalkTime(dist) +
       "</p>" +
+      (r.approximate
+        ? '<p class="disney-approx-note">공식 가이드맵 기준 랜드 단위 근사 위치예요 · 개별 화장실 GPS는 아직 검증되지 않았어요</p>'
+        : "") +
       '<div class="disney-detail-meta-row">' +
       '<span class="disney-detail-chip">다목적 ' +
       restroomFlag(r.multiPurpose) +

@@ -175,6 +175,9 @@ body.disney-page #app {
 .disney-marker.shop {
   background: var(--color-orange);
 }
+.disney-marker.restroom {
+  background: #5856d6;
+}
 .disney-marker.done {
   background: var(--color-gray);
   opacity: 0.6;
@@ -396,6 +399,9 @@ body.disney-page #app {
 .disney-row-icon.shop {
   background: var(--color-orange);
 }
+.disney-row-icon.restroom {
+  background: #5856d6;
+}
 .disney-row-body {
   flex: 1;
   min-width: 0;
@@ -510,6 +516,9 @@ body.disney-page #app {
 .disney-detail-icon.shop {
   background: var(--color-orange);
 }
+.disney-detail-icon.restroom {
+  background: #5856d6;
+}
 .disney-detail-title-group {
   flex: 1;
   min-width: 0;
@@ -604,6 +613,23 @@ body.disney-page #app {
   background: rgba(52, 199, 89, 0.12);
   padding: 2px 8px;
   border-radius: var(--radius-pill);
+}
+.disney-approx-badge {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-orange-dark);
+  background: rgba(255, 149, 0, 0.14);
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  vertical-align: middle;
+}
+.disney-approx-note {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: var(--color-orange-dark);
+  line-height: 1.4;
 }
 .disney-section-label {
   font-size: 12.5px;
