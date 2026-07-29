@@ -60,12 +60,30 @@
         </div>
         <div class="disney-search-results" id="disneySearchResults" hidden></div>
 
+        <!-- 파크 전환 (디즈니랜드 / 디즈니씨) -->
+        <div class="disney-park-switcher" id="disneyParkSwitcher"></div>
+
         <!-- 카테고리 필터 칩 -->
         <div class="disney-category-bar" id="disneyCategoryBar"></div>
 
         <!-- 지도 -->
         <div class="disney-map-wrap">
           <div id="disneyMap" class="disney-map"></div>
+
+          <!-- 상태 배너 (파크 외부 / GPS 정확도 낮음 / 타일 로드 실패) -->
+          <div class="disney-banner-stack">
+            <div class="disney-banner disney-banner-outside" id="disneyOutsideParkBanner" hidden></div>
+            <div class="disney-banner disney-banner-warning" id="disneyLowAccuracyBanner" hidden></div>
+            <div class="disney-banner disney-banner-warning" id="disneyTileErrorBanner" hidden></div>
+          </div>
+
+          <!-- 우측 상단 보조 액션 (아이 키 프로필 / 공식 지도 PDF / 더보기) -->
+          <div class="disney-quick-actions">
+            <button type="button" class="disney-quick-btn" id="disneyKidsProfileBtn" aria-label="아이 키 프로필">👶</button>
+            <a class="disney-quick-btn" id="disneyMapPdfLink" href="#" target="_blank" rel="noopener" aria-label="공식 지도 PDF 보기">🗺️</a>
+            <button type="button" class="disney-quick-btn" id="disneyMoreBtn" aria-label="더보기">⋯</button>
+          </div>
+          <div class="disney-more-menu" id="disneyMoreMenu" hidden></div>
 
           <!-- 가장 가까운 화장실 Floating Button -->
           <button type="button" class="disney-restroom-fab" id="disneyRestroomFab">🚻 가장 가까운 화장실</button>
@@ -89,6 +107,11 @@
         <!-- 화장실 찾기 바텀시트 -->
         <div class="disney-detail-overlay" id="disneyRestroomOverlay">
           <div class="disney-detail-sheet" id="disneyRestroomSheet"></div>
+        </div>
+
+        <!-- 아이 키 프로필 바텀시트 -->
+        <div class="disney-detail-overlay" id="disneyKidsProfileOverlay">
+          <div class="disney-detail-sheet" id="disneyKidsProfileSheet"></div>
         </div>
       </div>
     </div>

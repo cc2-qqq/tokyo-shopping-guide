@@ -1,7 +1,10 @@
 /**
  * ============================================================================
- * DISNEY_DATA — 도쿄 디즈니랜드 파크 지도의 유일한 데이터 소스
+ * DISNEY_DATA — 도쿄 디즈니랜드(tdl) / 도쿄 디즈니씨(tds) 파크 지도의 데이터
  * ============================================================================
+ * 두 파크는 완전히 분리된 네임스페이스(tdl/tds)를 쓰고, 절대 서로 데이터를
+ * 섞지 않는다(지도 중심, bounds, 어트랙션, 화장실, 마커, 경로 전부 별도).
+ *
  * 모든 좌표는 Playwright로 구글맵에 접속해 "정식 명칭 + 東京ディズニーランド"를
  * 검색한 뒤 @lat,lng와 표시된 장소명/주소를 교차검증해서 확인한 값만 넣었다.
  * 후보 목록에 있었지만 실제로는 미국 파크 매장이거나(Big Top Souvenirs,
@@ -10,19 +13,33 @@
  * Dime, "Swift Rabbit Cafe" → 실존하지 않아 Hungry Bear Restaurant로 대체)은
  * 검증 과정에서 걸러내거나 실제 존재하는 이름으로 바로잡았다.
  *
- * 확인이 안 되는 시설(화장실/AED/유모차 대여 등 편의시설)은 이 파일에 넣지
- * 않는다 — 대신 앱 화면에서 "디즈니 공식 앱에서 확인" 안내로 대체한다.
+ * 사용자가 제공한 공식 파크 가이드맵 PDF(TDL_map_kr.pdf)를 직접 열어 분석한
+ * 결과, 이 목록에 없는 어트랙션(스플래시 마운틴, 엔체인티드 티키룸 등)과
+ * 월드바자 상점 다수가 지도에 더 있는 것을 확인했다 — 이번 범위는 "주요
+ * 어트랙션/대표 상점"으로 의도적으로 좁힌 1차 조사 결과이며, 확장은 별도
+ * 조사 작업으로 진행한다(추측 좌표 추가 금지 원칙은 동일하게 적용).
+ *
+ * 도쿄 디즈니씨(tds)는 이번에 TDS_map_kr.pdf를 분석해 테마포트 구조와 주요
+ * 어트랙션 이름은 파악했지만, 단 하나의 좌표도 구글맵으로 검증하지 않았다.
+ * facilities를 비워두고 좌표를 임의로 만들지 않는다 — 별도 조사 후 채운다.
  *
  * rating(1~5)은 구글맵 등 외부 평점이 아니라, 인지도/인기를 참고해 이 앱에서
- * 임의로 매긴 "추천 지표"다(Quick Find의 "인기 어트랙션" 필터와 리스트 정렬용).
+ * 임의로 매긴 "추천 지표"다. darkRide/thrillLevel/indoor도 같은 성격의
+ * 일반 상식 수준 분류이며(공식 안전 정보 아님), 반면 minimumHeight/
+ * mustBeAccompanied/strollerParkingNearby는 실제로 탑승 가능 여부를 좌우하는
+ * 안전 정보라서 공식 텍스트로 재검증하기 전까지는 전부 null(확인 필요)로
+ * 남겨둔다 — js/disney.js의 FACILITY_DEFAULTS가 모든 시설에 이 필드들의
+ * 기본값을 채워 넣으므로 이 파일에는 실제로 아는 값만 적는다.
  *
- * category: 'attraction' | 'restaurant' | 'shop'
+ * category: 'attraction' | 'restaurant' | 'shop' | 'restroom'
  * ============================================================================
  */
 const DISNEY_DATA = {
-  disneyland: {
+  tdl: {
+    key: "tdl",
     name: "도쿄 디즈니랜드",
     coords: [35.6329, 139.8804],
+    mapPdf: "TDL_map_kr.pdf",
     facilities: [
       // ----------------------------------------------------------------
       // 어트랙션
@@ -38,6 +55,9 @@ const DISNEY_DATA = {
         description: "정글을 탐험하며 야생동물 애니매트로닉스를 만나는 보트 투어 어트랙션",
         recommendedTime: "약 9분",
         rating: 4,
+        indoor: false,
+        darkRide: false,
+        thrillLevel: 1,
         highlights: ["능청스러운 선장의 라이브 유머 해설", "리뉴얼된 화려한 야생동물 연출"],
       },
       {
@@ -51,6 +71,9 @@ const DISNEY_DATA = {
         description: "해적들의 세계를 항해하며 둘러보는 보트형 다크라이드",
         recommendedTime: "약 15분",
         rating: 5,
+        indoor: true,
+        darkRide: true,
+        thrillLevel: 1,
         highlights: ["디즈니 파크 최장급 보트 다크라이드", "실감나는 해적선 전투와 보물 창고 장면"],
       },
       {
@@ -64,6 +87,9 @@ const DISNEY_DATA = {
         description: "거대한 나무 위에 지어진 로빈슨 가족의 집을 걸어서 둘러보는 워크스루 어트랙션",
         recommendedTime: "약 10~15분",
         rating: 3,
+        indoor: false,
+        darkRide: false,
+        thrillLevel: 1,
         highlights: ["높은 곳에서 바라보는 어드벤처랜드 전망", "가족의 생활상을 재현한 아기자기한 소품들"],
       },
       {
@@ -77,6 +103,9 @@ const DISNEY_DATA = {
         description: "증기기관차를 타고 파크 외곽을 한 바퀴 도는 순환 열차 어트랙션",
         recommendedTime: "약 13분",
         rating: 3,
+        indoor: false,
+        darkRide: false,
+        thrillLevel: 1,
         highlights: ["공룡 디오라마와 그랜드캐니언 풍경 감상", "이동 수단이자 관람용으로도 즐길 수 있음"],
       },
       {
@@ -90,6 +119,9 @@ const DISNEY_DATA = {
         description: "폐광촌을 질주하는 광산 열차 콘셉트의 패밀리 롤러코스터",
         recommendedTime: "약 4분",
         rating: 5,
+        indoor: false,
+        darkRide: false,
+        thrillLevel: 2,
         highlights: ["아이도 즐길 수 있는 적당한 스릴", "정교하게 재현된 서부 광산촌 세트"],
       },
       {
@@ -103,6 +135,9 @@ const DISNEY_DATA = {
         description: "미시시피강을 재현한 리버스 오브 아메리카를 순회하는 증기선 유람",
         recommendedTime: "약 16분",
         rating: 3,
+        indoor: false,
+        darkRide: false,
+        thrillLevel: 1,
         highlights: ["선상 갑판에서 즐기는 여유로운 경치 감상", "웨스턴랜드 곳곳의 풍경을 물 위에서 조망"],
       },
       {
@@ -116,6 +151,9 @@ const DISNEY_DATA = {
         description: "뗏목을 타고 톰소여의 섬으로 건너가 자유롭게 탐험하는 체험형 어트랙션",
         recommendedTime: "뗏목 이동 약 2분 + 섬 탐험 자유",
         rating: 3,
+        indoor: false,
+        darkRide: false,
+        thrillLevel: 1,
         highlights: ["동굴과 흔들다리 등 숨은 탐험 요소", "아이들이 직접 뛰어놀 수 있는 야외 공간"],
       },
       {
@@ -129,6 +167,9 @@ const DISNEY_DATA = {
         description: "곰 캐릭터들이 펼치는 코믹한 애니매트로닉스 뮤지컬 쇼",
         recommendedTime: "약 15분",
         rating: 3,
+        indoor: true,
+        darkRide: false,
+        thrillLevel: 1,
         highlights: ["익살스러운 곰들의 컨트리 음악 공연", "실감나는 애니매트로닉스 연출"],
       },
       {
@@ -142,6 +183,9 @@ const DISNEY_DATA = {
         description: "손님이 직접 노를 저어 리버스 오브 아메리카를 탐험하는 체험형 카누 어트랙션",
         recommendedTime: "약 6분",
         rating: 3,
+        indoor: false,
+        darkRide: false,
+        thrillLevel: 1,
         highlights: ["직접 노를 젓는 참여형 체험", "날씨/시즌에 따라 운영되는 한정 어트랙션"],
       },
       {
@@ -155,6 +199,9 @@ const DISNEY_DATA = {
         description: "세계 각국의 인형과 노래로 꾸며진 실내 보트 투어",
         recommendedTime: "약 14분",
         rating: 5,
+        indoor: true,
+        darkRide: true,
+        thrillLevel: 1,
         highlights: ["전 세계 어린이 인형이 함께 부르는 시그니처 송", "화려한 색감의 실내 장식"],
       },
       {
@@ -168,6 +215,9 @@ const DISNEY_DATA = {
         description: "해적선을 타고 런던 야경에서 네버랜드까지 하늘을 나는 다크라이드",
         recommendedTime: "약 3분",
         rating: 5,
+        indoor: true,
+        darkRide: true,
+        thrillLevel: 1,
         highlights: ["하늘을 나는 듯한 독특한 탑승감", "런던에서 네버랜드로 이어지는 스토리 연출"],
       },
       {
@@ -181,6 +231,9 @@ const DISNEY_DATA = {
         description: "백설공주 이야기를 따라가는 트랙형 다크라이드",
         recommendedTime: "약 3분",
         rating: 3,
+        indoor: true,
+        darkRide: true,
+        thrillLevel: 1,
         highlights: ["동화 장면을 그대로 재현한 세트", "마녀 등장 등 은근한 스릴 요소"],
       },
       {
@@ -194,6 +247,9 @@ const DISNEY_DATA = {
         description: "피노키오의 모험을 따라가는 다크라이드",
         recommendedTime: "약 3분",
         rating: 3,
+        indoor: true,
+        darkRide: true,
+        thrillLevel: 1,
         highlights: ["피노키오 이야기를 따라가는 트랙형 라이드", "고래 몬스트로 장면의 스릴"],
       },
       {
@@ -207,6 +263,9 @@ const DISNEY_DATA = {
         description: "덤보 모양 탑승체를 타고 빙글빙글 돌며 높낮이를 조절하는 회전 라이드",
         recommendedTime: "약 2분",
         rating: 3,
+        indoor: false,
+        darkRide: false,
+        thrillLevel: 1,
         highlights: ["아이가 직접 높낮이를 조절하는 재미", "파스텔톤의 사랑스러운 비주얼"],
       },
       {
@@ -220,6 +279,9 @@ const DISNEY_DATA = {
         description: "찻잔 모양 탑승체를 타고 빙글빙글 도는 회전 라이드",
         recommendedTime: "약 2분",
         rating: 3,
+        indoor: false,
+        darkRide: false,
+        thrillLevel: 1,
         highlights: ["직접 회전 속도를 조절하는 재미", "이상한 나라의 앨리스를 테마로 한 아기자기한 장식"],
       },
       {
@@ -233,6 +295,9 @@ const DISNEY_DATA = {
         description: "신데렐라 성 앞에 위치한 클래식한 회전목마",
         recommendedTime: "약 2분",
         rating: 3,
+        indoor: false,
+        darkRide: false,
+        thrillLevel: 1,
         highlights: ["온 가족이 함께 탈 수 있는 어트랙션", "성 앞이라는 상징적인 포토 스팟"],
       },
       {
@@ -246,6 +311,9 @@ const DISNEY_DATA = {
         description: "999명의 유령이 산다는 저택을 탐험하는 코믹 호러 다크라이드",
         recommendedTime: "약 9분",
         rating: 5,
+        indoor: true,
+        darkRide: true,
+        thrillLevel: 2,
         highlights: ["익살스럽고 기묘한 분위기의 연출", "회전하는 방 등 독특한 특수효과"],
       },
       {
@@ -259,6 +327,9 @@ const DISNEY_DATA = {
         description: "벨과 야수의 이야기를 트랙 없는 라이드 차량으로 따라가는 도쿄 디즈니랜드 전용 어트랙션",
         recommendedTime: "약 8분",
         rating: 5,
+        indoor: true,
+        darkRide: true,
+        thrillLevel: 1,
         highlights: ["도쿄 디즈니랜드에서만 만날 수 있는 트랙리스 라이드", "무도회장 왈츠 장면 등 화려한 연출"],
       },
       {
@@ -272,6 +343,9 @@ const DISNEY_DATA = {
         description: "미키와 친구들이 다양한 음악과 춤으로 꾸미는 라이브 무대쇼(구 '미키의 마법의 음악회' 자리)",
         recommendedTime: "약 25분",
         rating: 3,
+        indoor: true,
+        darkRide: false,
+        thrillLevel: 1,
         highlights: ["미키를 비롯한 캐릭터들의 라이브 공연", "장르가 계속 바뀌는 다채로운 음악 구성"],
       },
       {
@@ -285,6 +359,9 @@ const DISNEY_DATA = {
         description: "꿀단지 모양 트랙리스 차량을 타고 100에이커 숲을 모험하는 어트랙션",
         recommendedTime: "약 4분",
         rating: 5,
+        indoor: true,
+        darkRide: true,
+        thrillLevel: 1,
         highlights: ["예측 불가능하게 움직이는 트랙리스 라이드", "바람 부는 숲 등 사계절 연출"],
       },
       {
@@ -298,6 +375,9 @@ const DISNEY_DATA = {
         description: "실내 암전 속을 질주하는 우주여행 콘셉트의 롤러코스터",
         recommendedTime: "약 3분",
         rating: 5,
+        indoor: true,
+        darkRide: true,
+        thrillLevel: 3,
         highlights: ["빛과 어둠 속 스릴 만점 코스터", "우주를 여행하는 듯한 몰입감"],
       },
       {
@@ -311,6 +391,9 @@ const DISNEY_DATA = {
         description: "스타워즈 세계관 속에서 매번 다른 스토리로 즐기는 시뮬레이터 라이드",
         recommendedTime: "약 5분",
         rating: 4,
+        indoor: true,
+        darkRide: true,
+        thrillLevel: 2,
         highlights: ["매번 랜덤 조합되는 다양한 스토리", "생생한 3D 우주 비행 체험"],
       },
       {
@@ -324,6 +407,9 @@ const DISNEY_DATA = {
         description: "직접 광선총을 조준해 점수를 겨루는 인터랙티브 슈팅 다크라이드",
         recommendedTime: "약 5분",
         rating: 4,
+        indoor: true,
+        darkRide: true,
+        thrillLevel: 2,
         highlights: ["가족끼리 점수 경쟁하며 즐기는 재미", "장난감 나라를 재현한 화려한 세트"],
       },
       {
@@ -337,6 +423,9 @@ const DISNEY_DATA = {
         description: "손전등으로 몬스터를 찾아내는 도쿄 디즈니랜드 단독 인터랙티브 다크라이드",
         recommendedTime: "약 4분",
         rating: 4,
+        indoor: true,
+        darkRide: true,
+        thrillLevel: 1,
         highlights: ["도쿄 디즈니랜드에서만 즐길 수 있는 단독 어트랙션", "손전등으로 몬스터를 찾는 게임 요소"],
       },
       {
@@ -350,6 +439,9 @@ const DISNEY_DATA = {
         description: "빅 히어로 6를 테마로 신나는 음악에 맞춰 회전하는 라이드",
         recommendedTime: "약 2분",
         rating: 4,
+        indoor: true,
+        darkRide: false,
+        thrillLevel: 2,
         highlights: ["신나는 음악과 함께하는 회전 라이드", "베이맥스의 귀여운 비주얼"],
       },
       {
@@ -363,6 +455,9 @@ const DISNEY_DATA = {
         description: "택시 모양 탑승체를 직접 돌리며 만화 같은 툰타운을 누비는 스피닝 다크라이드",
         recommendedTime: "약 3분",
         rating: 4,
+        indoor: true,
+        darkRide: true,
+        thrillLevel: 1,
         highlights: ["택시를 직접 돌리며 즐기는 스피닝 라이드", "만화 같은 툰타운 세트 속 추격전"],
       },
 
@@ -593,13 +688,14 @@ const DISNEY_DATA = {
       },
 
       // ----------------------------------------------------------------
-      // 화장실 — 사용자가 제공한 공식 파크 가이드맵(손그림 스타일 일러스트)에서
-      // 각 랜드마다 화장실 아이콘이 있는 것을 확인했다. 다만 그 지도는 GPS
-      // 축척이 아니라 정확한 픽셀 좌표를 실제 좌표로 환산하는 건 오독 위험이
-      // 크다고 판단해, 새 좌표를 추정하는 대신 이미 구글맵으로 검증된 각 랜드
-      // 중심부의 실제 좌표를 그대로 재사용했다("이 근처에 화장실이 있다"는
-      // 랜드 단위 근사치). 다목적 화장실 여부 등 세부 시설 정보는 지도에서
-      // 정확히 구분할 수 없어 null(확인 필요)로 남겨둔다 — 추측 금지.
+      // 화장실 — 공식 파크 가이드맵(TDL_map_kr.pdf)에서 각 랜드마다 화장실
+      // 아이콘이 있는 것을 확인했다. 손그림 스타일 지도라 정확한 픽셀 좌표를
+      // 실제 좌표로 환산하는 건 오독 위험이 커서, 새 좌표를 추정하는 대신
+      // 이미 구글맵으로 검증된 각 랜드 중심부의 실제 좌표를 그대로 재사용했다
+      // ("이 근처에 화장실이 있다"는 랜드 단위 근사치). verified:false와
+      // source로 이 출처를 명시한다. 다목적 화장실 여부 등 세부 시설 정보는
+      // 지도에서 정확히 구분할 수 없어 null(확인 필요)로 남겨둔다.
+      // ----------------------------------------------------------------
       {
         id: "restroom-world-bazaar",
         name: "월드바자 화장실",
@@ -607,6 +703,8 @@ const DISNEY_DATA = {
         area: "월드바자",
         coords: [35.6343991, 139.8793314],
         approximate: true,
+        verified: false,
+        source: "TDL_map_kr.pdf (랜드 단위 근사, 좌표는 그랜드 엠포리엄 앵커)",
         description: "공식 가이드맵 기준 월드바자 구역 화장실 위치(그랜드 엠포리엄 인근) — 정확한 개별 GPS는 미검증",
         recommendedTime: "약 5분",
         multiPurpose: null,
@@ -621,6 +719,8 @@ const DISNEY_DATA = {
         area: "어드벤처랜드",
         coords: [35.6342439, 139.8807329],
         approximate: true,
+        verified: false,
+        source: "TDL_map_kr.pdf (랜드 단위 근사, 좌표는 카리브의 해적 앵커)",
         description: "공식 가이드맵 기준 어드벤처랜드 구역 화장실 위치(카리브의 해적 인근) — 정확한 개별 GPS는 미검증",
         recommendedTime: "약 5분",
         multiPurpose: null,
@@ -635,6 +735,8 @@ const DISNEY_DATA = {
         area: "웨스턴랜드",
         coords: [35.6326228, 139.8816633],
         approximate: true,
+        verified: false,
+        source: "TDL_map_kr.pdf (랜드 단위 근사, 좌표는 더 다이아몬드 호스슈 앵커)",
         description: "공식 가이드맵 기준 웨스턴랜드 구역 화장실 위치(더 다이아몬드 호스슈 인근) — 정확한 개별 GPS는 미검증",
         recommendedTime: "약 5분",
         multiPurpose: null,
@@ -649,6 +751,8 @@ const DISNEY_DATA = {
         area: "크리터컨트리",
         coords: [35.6310799, 139.8825518],
         approximate: true,
+        verified: false,
+        source: "TDL_map_kr.pdf (랜드 단위 근사, 좌표는 그랜마 사라의 키친 앵커)",
         description: "공식 가이드맵 기준 크리터컨트리 구역 화장실 위치(그랜마 사라의 키친 인근) — 정확한 개별 GPS는 미검증",
         recommendedTime: "약 5분",
         multiPurpose: null,
@@ -663,6 +767,8 @@ const DISNEY_DATA = {
         area: "판타지랜드",
         coords: [35.630542, 139.8800801],
         approximate: true,
+        verified: false,
+        source: "TDL_map_kr.pdf (랜드 단위 근사, 좌표는 곰돌이 푸의 허니 헌트 앵커)",
         description: "공식 가이드맵 기준 판타지랜드 구역 화장실 위치(곰돌이 푸의 허니 헌트 인근) — 정확한 개별 GPS는 미검증",
         recommendedTime: "약 5분",
         multiPurpose: null,
@@ -677,6 +783,8 @@ const DISNEY_DATA = {
         area: "툰타운",
         coords: [35.6299537, 139.8801987],
         approximate: true,
+        verified: false,
+        source: "TDL_map_kr.pdf (랜드 단위 근사, 좌표는 개그 팩토리/파이브 앤 다임 앵커)",
         description: "공식 가이드맵 기준 툰타운 구역 화장실 위치(개그 팩토리/파이브 앤 다임 인근) — 정확한 개별 GPS는 미검증",
         recommendedTime: "약 5분",
         multiPurpose: null,
@@ -691,6 +799,8 @@ const DISNEY_DATA = {
         area: "투머로우랜드",
         coords: [35.6319086, 139.8795571],
         approximate: true,
+        verified: false,
+        source: "TDL_map_kr.pdf (랜드 단위 근사, 좌표는 투머로우랜드 테라스 앵커)",
         description: "공식 가이드맵 기준 투머로우랜드 구역 화장실 위치(투머로우랜드 테라스 인근) — 정확한 개별 GPS는 미검증",
         recommendedTime: "약 5분",
         multiPurpose: null,
@@ -699,5 +809,20 @@ const DISNEY_DATA = {
         nearBabyCenter: null,
       },
     ],
+  },
+
+  tds: {
+    key: "tds",
+    name: "도쿄 디즈니씨",
+    // TDS_map_kr.pdf를 열어 8개 테마포트 구조(미디터레이니언 하버·아메리칸
+    // 워터프론트·포트 디스커버리·로스트 리버 델타·아라비안 코스트·머메이드
+    // 라군·미스테리어스 아일랜드·판타지 스프링스)와 주요 어트랙션 이름은
+    // 파악했지만, 이 좌표는 구글맵으로 검증되지 않은 리조트 지역 대략치일
+    // 뿐이며 개별 시설 위치가 아니다 — 지도를 열었을 때 카메라 위치용으로만
+    // 쓰고, 시설 데이터가 채워지기 전까지 facilities는 비워둔다.
+    coords: [35.6267, 139.8853],
+    coordsVerified: false,
+    mapPdf: "TDS_map_kr.pdf",
+    facilities: [],
   },
 };

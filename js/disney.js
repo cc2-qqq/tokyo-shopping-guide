@@ -1,25 +1,23 @@
 /**
  * ============================================================================
- * Tokyo Disneyland Interactive Map — 렌더링/상태/이벤트
+ * Tokyo Disneyland / Tokyo DisneySea Interactive Map — 렌더링/상태/이벤트
  * ============================================================================
- * DISNEY_DATA(js/disneyData.js)를 유일한 데이터 소스로 사용한다.
- * 길찾기는 파크 내부 보행로 데이터가 없어 직선거리 기준 추정치이며,
- * 화면에 항상 "실제 동선과 다를 수 있음"을 함께 표시한다.
+ * DISNEY_DATA(js/disneyData.js)의 tdl/tds 두 네임스페이스를 완전히 분리해서
+ * 다룬다 — 마커/bounds/즐겨찾기/완료기록/경로는 파크마다 절대 섞이지 않는다.
  *
- * 화장실/베이비/충전/휴식/응급시설은 공식적으로 검증 가능한 좌표 출처가
- * 없어 DISNEY_DATA에 아직 데이터가 없다 — 이 카테고리들은 UI(칩, 화장실
- * 찾기 버튼)는 갖춰두되, 실제로는 항상 "확인 필요" 상태로 우아하게
- * 처리한다(추측 좌표를 만들어 넣지 않는다).
+ * 길찾기는 파크 내부 보행로 데이터가 없어 직선거리 기준 추정치이며,
+ * 화면에 항상 "실제 동선과 다를 수 있음"을 함께 표시한다(OSRM으로 실제
+ * 좌표를 질의해봤더니 요청 지점이 110~140m 밖 도로로 스냅되는 것으로
+ * 확인되어, 실내 보행망 데이터가 없다는 게 실측으로 확인됨).
+ *
+ * 화장실 중 일부(TDL)는 공식 가이드맵 기준 랜드 단위 근사치이고, 베이비/
+ * 충전/휴식/응급시설/코인락커와 디즈니씨 전체 데이터는 아직 검증된 좌표가
+ * 없다 — 이 카테고리들은 UI(칩, 화장실 찾기 버튼)는 갖춰두되, 데이터가
+ * 없으면 항상 "확인 필요/준비 중" 상태로 우아하게 처리한다.
  * ============================================================================
  */
 (function () {
   "use strict";
-
-  const STORAGE_KEYS = {
-    favorites: "tokyoGuide.disney.favorites.v1",
-    completed: "tokyoGuide.disney.completed.v1",
-    memos: "tokyoGuide.disney.memos.v1",
-  };
 
   const CATEGORY_ICON = { attraction: "🎢", restaurant: "🍽️", shop: "🛍️", restroom: "🚻" };
   const CATEGORY_LABEL = { attraction: "어트랙션", restaurant: "레스토랑", shop: "샵", restroom: "화장실" };
@@ -37,23 +35,47 @@
     { id: "charging", icon: "🔋", label: "충전" },
     { id: "rest", icon: "🪑", label: "휴식" },
     { id: "emergency", icon: "➕", label: "응급시설" },
+    { id: "locker", icon: "📦", label: "코인락커" },
   ];
-  const AVAILABLE_CATEGORIES = ["attraction", "restaurant", "shop", "restroom"];
   const SORT_LABEL = { distance: "거리순", area: "구역별", name: "가나다순", rating: "평점순" };
   const COMPASS_KO = ["북", "북동", "동", "남동", "남", "남서", "서", "북서"];
 
+  // 시설 스키마의 "아이 동반" 관련 필드 기본값 — 공식 텍스트로 재검증되기
+  // 전까지는 전부 null(확인 필요)이다. 지도 이미지의 아이콘/숫자를 읽어서
+  // 임의로 채우지 않는다(잘못된 키 제한은 실제로 탑승 거부·헛걸음으로
+  // 이어질 수 있음).
+  const FACILITY_DEFAULTS = {
+    minimumHeight: null,
+    mustBeAccompanied: null,
+    strollerParkingNearby: null,
+    childFriendly: null,
+    verified: true,
+    source: "google-maps-verified",
+  };
+
   const state = {
+    currentPark: "tdl", // 'tdl' | 'tds' — 두 파크의 모든 상태를 이 값 하나로 완전히 분리한다
     map: null,
     clusterGroup: null,
     categoryMarkers: {},
     favoriteMarkersLayer: null,
     destinationMarker: null,
     userMarkerLayer: null,
+    routeRestroomLayer: null,
+    parkBoundsCache: {}, // { tdl: L.LatLngBounds, tds: L.LatLngBounds }
     favorites: {},
     completed: {},
     memos: {},
+    controlled: {}, // { facilityId: true } — 사용자가 "통제 중"으로 표시한 시설(추천 동선에서 제외)
+    kidsProfile: [], // [{ name, heightCm }] — 파크 공통(가족 단위이므로 파크별로 나누지 않음)
     userLocation: null,
+    lastGoodAccuracy: null,
+    recentFixes: [], // GPS 스무딩용 최근 픽스 큐
+    rejectedJumpStreak: 0, // 연속으로 "비정상 이동"이라 거부된 픽스 수(아래 JUMP_REJECT_LIMIT 참고)
     watchId: null,
+    watchMode: "idle", // 'idle' | 'navigating' — 배터리 절약을 위해 길찾기 중에만 고빈도로 갱신
+    outsideStreak: 0, // 연속으로 파크 밖으로 감지된 횟수(오탐 방지용 디바운스)
+    isInsidePark: true,
     headingSupported: false,
     activeCategory: null,
     activeTab: "list",
@@ -62,20 +84,26 @@
     routeTargetId: null,
     routeLine: null,
     routeRestroomMarkers: [],
+    lastRouteOrigin: null, // 재탐색 판단 기준(이전에 경로를 그렸던 시작 좌표)
     navigationMode: false,
     showRestroomsAlongRoute: false,
     pickLocationMode: false,
+    moreMenuOpen: false,
   };
 
   const dom = {};
   let toastTimer = null;
+  let resizeDebounceTimer = null;
 
   document.addEventListener("DOMContentLoaded", init);
 
   function init() {
     cacheDom();
-    loadStorage();
+    loadSharedStorage();
+    loadParkStorage();
+    dom.mapPdfLink.href = getParkData().mapPdf;
     initMap();
+    renderParkSwitcher();
     renderCategoryBar();
     renderCategoryMarkers();
     renderFavoriteMarkers();
@@ -83,15 +111,21 @@
     renderSheetContent();
     applySheetState("collapsed", { silent: true });
     bindEvents();
+    window.addEventListener("error", () => {}); // 예기치 못한 오류로 화면이 완전히 멈추지 않도록 최소 안전망
+    window.addEventListener("unhandledrejection", () => {});
   }
 
   function cacheDom() {
     dom.searchInput = document.getElementById("disneySearchInput");
     dom.searchResults = document.getElementById("disneySearchResults");
+    dom.parkSwitcher = document.getElementById("disneyParkSwitcher");
     dom.categoryBar = document.getElementById("disneyCategoryBar");
     dom.mapWrap = document.querySelector(".disney-map-wrap");
     dom.restroomFab = document.getElementById("disneyRestroomFab");
     dom.locationFallback = document.getElementById("disneyLocationFallback");
+    dom.outsideParkBanner = document.getElementById("disneyOutsideParkBanner");
+    dom.tileErrorBanner = document.getElementById("disneyTileErrorBanner");
+    dom.lowAccuracyBanner = document.getElementById("disneyLowAccuracyBanner");
     dom.sheet = document.getElementById("disneySheet");
     dom.sheetHandle = document.getElementById("disneySheetHandle");
     dom.sheetTabs = document.getElementById("disneySheetTabs");
@@ -101,16 +135,25 @@
     dom.restroomOverlay = document.getElementById("disneyRestroomOverlay");
     dom.restroomSheet = document.getElementById("disneyRestroomSheet");
     dom.locateBtn = document.getElementById("disneyLocateBtn");
+    dom.moreBtn = document.getElementById("disneyMoreBtn");
+    dom.moreMenu = document.getElementById("disneyMoreMenu");
+    dom.mapPdfLink = document.getElementById("disneyMapPdfLink");
+    dom.kidsProfileBtn = document.getElementById("disneyKidsProfileBtn");
+    dom.kidsProfileOverlay = document.getElementById("disneyKidsProfileOverlay");
+    dom.kidsProfileSheet = document.getElementById("disneyKidsProfileSheet");
     dom.toast = document.getElementById("toast");
   }
 
   // ---------------------------------------------------------------------
-  // LocalStorage
+  // LocalStorage — 즐겨찾기/완료/메모/통제구역은 파크별로 완전히 분리,
+  // 아이 키 프로필은 가족 공통이라 파크와 무관하게 하나만 둔다.
   // ---------------------------------------------------------------------
-  function loadStorage() {
-    state.favorites = safeParse(localStorage.getItem(STORAGE_KEYS.favorites)) || {};
-    state.completed = safeParse(localStorage.getItem(STORAGE_KEYS.completed)) || {};
-    state.memos = safeParse(localStorage.getItem(STORAGE_KEYS.memos)) || {};
+  function parkStorageKey(name) {
+    return "tokyoGuide.disney." + state.currentPark + "." + name + ".v1";
+  }
+  function legacyStorageKey(name) {
+    // 파크 구분이 생기기 전(디즈니랜드 단일 파크 시절) 저장했던 키 — tdl로 1회 이관한다
+    return "tokyoGuide.disney." + name + ".v1";
   }
   function safeParse(json) {
     try {
@@ -119,24 +162,68 @@
       return null;
     }
   }
-  function persistFavorites() {
-    localStorage.setItem(STORAGE_KEYS.favorites, JSON.stringify(state.favorites));
+  function safeGetItem(key) {
+    try {
+      return localStorage.getItem(key);
+    } catch (e) {
+      return null; // 시크릿 모드 등으로 스토리지 접근 자체가 막힌 경우
+    }
   }
-  function persistCompleted() {
-    localStorage.setItem(STORAGE_KEYS.completed, JSON.stringify(state.completed));
-  }
-  function persistMemos() {
-    localStorage.setItem(STORAGE_KEYS.memos, JSON.stringify(state.memos));
+  function safeSetItem(key, value) {
+    try {
+      localStorage.setItem(key, value);
+    } catch (e) {
+      showToast("기기 저장공간에 문제가 있어 임시로만 저장돼요");
+    }
   }
 
+  function loadParkStorage() {
+    ["favorites", "completed", "memos", "controlled"].forEach((name) => {
+      let raw = safeGetItem(parkStorageKey(name));
+      if (raw == null && state.currentPark === "tdl") {
+        // 이전 세션(파크 구분 없던 시절)의 디즈니랜드 데이터를 한 번만 이관
+        const legacy = safeGetItem(legacyStorageKey(name));
+        if (legacy != null) {
+          raw = legacy;
+          safeSetItem(parkStorageKey(name), legacy);
+        }
+      }
+      state[name] = safeParse(raw) || {};
+    });
+  }
+  function loadSharedStorage() {
+    state.kidsProfile = safeParse(safeGetItem("tokyoGuide.disney.kidsProfile.v1")) || [];
+  }
+  function persistFavorites() {
+    safeSetItem(parkStorageKey("favorites"), JSON.stringify(state.favorites));
+  }
+  function persistCompleted() {
+    safeSetItem(parkStorageKey("completed"), JSON.stringify(state.completed));
+  }
+  function persistMemos() {
+    safeSetItem(parkStorageKey("memos"), JSON.stringify(state.memos));
+  }
+  function persistControlled() {
+    safeSetItem(parkStorageKey("controlled"), JSON.stringify(state.controlled));
+  }
+  function persistKidsProfile() {
+    safeSetItem("tokyoGuide.disney.kidsProfile.v1", JSON.stringify(state.kidsProfile));
+  }
+
+  // ---------------------------------------------------------------------
+  // 파크 데이터 접근 — 이 함수들만 거치면 항상 현재 선택된 파크 기준이다
+  // ---------------------------------------------------------------------
+  function getParkData() {
+    return DISNEY_DATA[state.currentPark];
+  }
   function getFacilities() {
-    return DISNEY_DATA.disneyland.facilities;
+    return getParkData().facilities.map((f) => Object.assign({}, FACILITY_DEFAULTS, f));
   }
   function findFacility(id) {
     return getFacilities().find((f) => f.id === id) || null;
   }
   function getOrigin() {
-    return state.userLocation || DISNEY_DATA.disneyland.coords;
+    return state.userLocation || getParkData().coords;
   }
 
   // 현재 활성 카테고리 기준으로 걸러진 시설 목록 — 지도 마커와 목록 탭이 공유한다.
@@ -144,31 +231,106 @@
   // 않는다(현재 위치/즐겨찾기/목적지만 보이는 게 이번 개편의 핵심 목표).
   function getCategoryFilteredFacilities() {
     const cat = state.activeCategory;
+    const facilities = getFacilities();
     if (!cat) return [];
-    if (cat === "all") return getFacilities();
-    if (AVAILABLE_CATEGORIES.indexOf(cat) !== -1) return getFacilities().filter((f) => f.category === cat);
-    return []; // 아직 데이터가 없는 카테고리(화장실/베이비/충전/휴식/응급시설)
+    if (cat === "all") return facilities;
+    const known = ["attraction", "restaurant", "shop", "restroom"];
+    if (known.indexOf(cat) !== -1) return facilities.filter((f) => f.category === cat);
+    return []; // 아직 데이터가 없는 카테고리(베이비/충전/휴식/응급시설/코인락커)
+  }
+
+  function isKnownCategory(catId) {
+    return catId === "all" || getFacilities().some((f) => f.category === catId) || catId === "restroom";
+  }
+
+  // ---------------------------------------------------------------------
+  // 파크 경계(bounds) — 검증된 시설 좌표에서만 계산한다(1순위). 좌표가
+  // 없는 파크(TDS)는 파크 중심 주변의 넉넉한 임시 사각형을 쓴다.
+  // 이상치(다른 좌표들과 비정상적으로 먼 점 하나 때문에 bounds가 과도하게
+  // 넓어지는 것)는 중앙값 기준 거리로 걸러낸다.
+  // ---------------------------------------------------------------------
+  function computeParkBounds(parkKey) {
+    if (state.parkBoundsCache[parkKey]) return state.parkBoundsCache[parkKey];
+
+    const park = DISNEY_DATA[parkKey];
+    const points = park.facilities.map((f) => f.coords).concat([park.coords]);
+
+    let usablePoints = points;
+    if (points.length >= 4) {
+      const lats = points.map((p) => p[0]).sort((a, b) => a - b);
+      const lngs = points.map((p) => p[1]).sort((a, b) => a - b);
+      const medianLat = lats[Math.floor(lats.length / 2)];
+      const medianLng = lngs[Math.floor(lngs.length / 2)];
+      // 중앙값에서 haversineMeters로 너무 멀리 떨어진(파크 규모상 비정상적인) 점은 제외
+      usablePoints = points.filter((p) => haversineMeters([medianLat, medianLng], p) < 3000);
+    }
+
+    let bounds;
+    if (usablePoints.length >= 2) {
+      bounds = L.latLngBounds(usablePoints).pad(0.08);
+    } else {
+      // 검증된 좌표가 파크 중심 하나뿐(TDS) — 파크 규모를 감안한 넉넉한 임시 사각형
+      const c = park.coords;
+      const d = 0.012; // 약 1.3km 반경
+      bounds = L.latLngBounds([c[0] - d, c[1] - d], [c[0] + d, c[1] + d]);
+    }
+    state.parkBoundsCache[parkKey] = bounds;
+    return bounds;
+  }
+
+  function recomputeMinZoom() {
+    if (!state.map) return;
+    const bounds = computeParkBounds(state.currentPark);
+    try {
+      const zoom = state.map.getBoundsZoom(bounds, false);
+      state.map.setMinZoom(Math.max(14, zoom - 0.5));
+    } catch (e) {
+      state.map.setMinZoom(15);
+    }
   }
 
   // ---------------------------------------------------------------------
   // Map
   // ---------------------------------------------------------------------
   function initMap() {
-    state.map = L.map("disneyMap", { zoomControl: false, attributionControl: true }).setView(
-      DISNEY_DATA.disneyland.coords,
-      16
-    );
+    const bounds = computeParkBounds(state.currentPark);
+    state.map = L.map("disneyMap", { zoomControl: false, attributionControl: true, maxBoundsViscosity: 0.9 });
+    state.map.fitBounds(bounds, { padding: [12, 12] });
+    state.map.setMaxBounds(bounds);
+    state.map.setMaxZoom(19);
+
     L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
       attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
       maxZoom: 19,
       subdomains: "abcd",
-    }).addTo(state.map);
+    })
+      .on("tileerror", handleTileError)
+      .addTo(state.map);
+
     L.control.zoom({ position: "bottomright" }).addTo(state.map);
 
     state.clusterGroup = L.markerClusterGroup({ maxClusterRadius: 55, spiderfyOnMaxZoom: true, showCoverageOnHover: false });
     state.map.addLayer(state.clusterGroup);
     state.favoriteMarkersLayer = L.layerGroup().addTo(state.map);
     state.userMarkerLayer = L.layerGroup().addTo(state.map);
+    state.routeRestroomLayer = L.layerGroup().addTo(state.map);
+
+    recomputeMinZoom();
+
+    // maxBounds가 대부분 막아주지만, 관성 스크롤 등으로 살짝 벗어난 경우의 안전망.
+    // panInsideBounds 자체가 다시 moveend를 동기적으로 발생시킬 수 있어(Leaflet의
+    // maxBounds 내부 보정과 겹치면 특히), 재진입 방지 플래그 없이는 스택 오버플로우가
+    // 날 수 있다 — 실제로 파크 전환 중 재현되어 이 가드를 추가함.
+    let boundsCorrectionInProgress = false;
+    state.map.on("moveend", () => {
+      if (boundsCorrectionInProgress) return;
+      const b = computeParkBounds(state.currentPark);
+      if (!b.contains(state.map.getCenter())) {
+        boundsCorrectionInProgress = true;
+        state.map.panInsideBounds(b, { animate: false });
+        boundsCorrectionInProgress = false;
+      }
+    });
 
     state.map.on("click", (e) => {
       if (!state.pickLocationMode) return;
@@ -179,11 +341,34 @@
       if (state.routeTargetId) drawRoute();
       else refreshDistanceDependentUI();
     });
+
+    window.addEventListener("resize", handleViewportChange);
+    window.addEventListener("orientationchange", handleViewportChange);
+  }
+
+  let tileErrorShown = false;
+  function handleTileError() {
+    if (tileErrorShown) return;
+    tileErrorShown = true;
+    dom.tileErrorBanner.hidden = false;
+    dom.tileErrorBanner.textContent = "🗺️ 지도 타일을 불러오지 못했습니다 · 목록과 검색은 계속 사용할 수 있어요";
+  }
+
+  function handleViewportChange() {
+    clearTimeout(resizeDebounceTimer);
+    resizeDebounceTimer = setTimeout(() => {
+      if (!state.map) return;
+      state.map.invalidateSize();
+      recomputeMinZoom();
+      const b = computeParkBounds(state.currentPark);
+      if (!b.contains(state.map.getCenter())) state.map.panInsideBounds(b, { animate: false });
+    }, 200);
   }
 
   function buildFacilityMarker(facility, opts) {
     opts = opts || {};
     const isDone = !!state.completed[facility.id];
+    const isControlled = !!state.controlled[facility.id];
     const isFav = !!state.favorites[facility.id];
     const size = opts.large ? 46 : 30;
     const icon = L.divIcon({
@@ -192,10 +377,11 @@
         '<div class="disney-marker ' +
         facility.category +
         (isDone ? " done" : "") +
+        (isControlled ? " controlled" : "") +
         (opts.large ? " large" : "") +
         (opts.favorite && isFav ? " favorite" : "") +
         '"><span>' +
-        CATEGORY_ICON[facility.category] +
+        (isControlled ? "🚧" : CATEGORY_ICON[facility.category]) +
         "</span></div>",
       iconSize: [size, size],
       iconAnchor: [size / 2, size],
@@ -247,12 +433,83 @@
   }
 
   // ---------------------------------------------------------------------
+  // 파크 전환 — Disneyland / DisneySea. 모든 화면 상태를 완전히 초기화한 뒤
+  // 새 파크 데이터/bounds/줌을 다시 적용한다(두 파크 데이터를 섞지 않음).
+  // ---------------------------------------------------------------------
+  function renderParkSwitcher() {
+    const parks = [
+      { key: "tdl", label: "🏰 디즈니랜드" },
+      { key: "tds", label: "🌊 디즈니씨" },
+    ];
+    dom.parkSwitcher.innerHTML = parks
+      .map(
+        (p) =>
+          '<button type="button" class="disney-park-tab' +
+          (state.currentPark === p.key ? " active" : "") +
+          '" data-park="' +
+          p.key +
+          '">' +
+          p.label +
+          "</button>"
+      )
+      .join("");
+  }
+
+  function switchPark(parkKey) {
+    if (parkKey === state.currentPark || !DISNEY_DATA[parkKey]) return;
+
+    // 1~7: 이전 파크의 화면 상태를 전부 초기화
+    closeDetail();
+    closeRestroomFinder();
+    closeMoreMenu();
+    if (state.routeTargetId) closeRoute();
+    state.activeCategory = null;
+    dom.searchInput.value = "";
+    dom.searchResults.hidden = true;
+    dom.searchResults.innerHTML = "";
+    state.userLocation = null;
+    state.recentFixes = [];
+    state.outsideStreak = 0;
+    state.isInsidePark = true;
+    hideOutsideParkBanner();
+    if (state.watchId != null) {
+      navigator.geolocation.clearWatch(state.watchId);
+      state.watchId = null;
+      dom.locateBtn.classList.remove("locate-active");
+    }
+    state.userMarkerLayer.clearLayers();
+
+    // 8: 새 파크 데이터 로드
+    state.currentPark = parkKey;
+    loadParkStorage();
+
+    // 9~11: 새 bounds/줌/전체보기 적용
+    const bounds = computeParkBounds(parkKey);
+    state.map.setMaxBounds(bounds);
+    state.map.fitBounds(bounds, { padding: [12, 12] });
+    recomputeMinZoom();
+
+    dom.mapPdfLink.href = getParkData().mapPdf;
+
+    renderParkSwitcher();
+    renderCategoryBar();
+    renderCategoryMarkers();
+    renderFavoriteMarkers();
+    renderSheetTabs();
+    renderSheetContent();
+
+    if (getParkData().facilities.length === 0) {
+      showToast(getParkData().name + " 데이터는 아직 준비 중이에요 — 실제 좌표 조사가 끝나는 대로 채워질 예정입니다");
+    }
+  }
+
+  // ---------------------------------------------------------------------
   // 카테고리 필터 칩
   // ---------------------------------------------------------------------
   function renderCategoryBar() {
     dom.categoryBar.innerHTML = CATEGORIES.map((c) => {
       const isActive = state.activeCategory === c.id;
-      const unavailable = c.id !== "all" && AVAILABLE_CATEGORIES.indexOf(c.id) === -1;
+      const unavailable = c.id !== "all" && !getFacilities().some((f) => f.category === c.id);
       return (
         '<button type="button" class="disney-chip' +
         (isActive ? " active" : "") +
@@ -272,14 +529,14 @@
     state.activeCategory = state.activeCategory === catId ? null : catId;
     renderCategoryBar();
     renderCategoryMarkers();
-    if (state.activeCategory && AVAILABLE_CATEGORIES.indexOf(state.activeCategory) === -1 && state.activeCategory !== "all") {
+    if (state.activeCategory && state.activeCategory !== "all" && !getFacilities().some((f) => f.category === state.activeCategory)) {
       showToast("아직 준비 중인 카테고리예요 · 디즈니 공식 앱에서 확인해주세요");
     }
     if (state.activeTab === "list") renderListTab();
   }
 
   // ---------------------------------------------------------------------
-  // Search
+  // Search — 한글/영문/일본어 별칭 모두 매칭
   // ---------------------------------------------------------------------
   function handleSearchInput() {
     const q = dom.searchInput.value.trim().toLowerCase();
@@ -300,8 +557,10 @@
   function buildRowHtml(f, kind) {
     const isFav = !!state.favorites[f.id];
     const isDone = !!state.completed[f.id];
+    const isControlled = !!state.controlled[f.id];
     const rowClass = kind === "result" ? "disney-result-row" : "disney-list-row" + (isDone ? " done" : "");
     const dist = haversineMeters(getOrigin(), f.coords);
+    const heightNote = f.minimumHeight != null ? "키 " + f.minimumHeight + "cm~" : "";
     return (
       '<div class="' +
       rowClass +
@@ -311,10 +570,11 @@
       '<span class="disney-row-icon ' +
       f.category +
       '">' +
-      CATEGORY_ICON[f.category] +
+      (isControlled ? "🚧" : CATEGORY_ICON[f.category]) +
       "</span>" +
       '<span class="disney-row-body"><span class="disney-row-name">' +
       escapeHtml(f.name) +
+      (isControlled ? '<span class="disney-controlled-badge">통제중</span>' : "") +
       "</span>" +
       '<span class="disney-row-meta">' +
       escapeHtml(f.area) +
@@ -322,6 +582,7 @@
       formatDistance(dist) +
       " · " +
       formatWalkTime(dist) +
+      (heightNote ? " · " + heightNote : "") +
       "</span></span>" +
       '<div class="disney-row-actions">' +
       '<button type="button" class="disney-row-fav' +
@@ -376,7 +637,10 @@
     }
     const facilities = getCategoryFilteredFacilities();
     if (facilities.length === 0) {
-      dom.sheetContent.innerHTML = '<p class="disney-empty-note">이 카테고리는 아직 준비 중이에요<br>디즈니 공식 앱에서 확인해주세요</p>';
+      const notReadyMsg = getParkData().facilities.length === 0
+        ? getParkData().name + " 데이터는 아직 준비 중이에요"
+        : "이 카테고리는 아직 준비 중이에요<br>디즈니 공식 앱에서 확인해주세요";
+      dom.sheetContent.innerHTML = '<p class="disney-empty-note">' + notReadyMsg + "</p>";
       return;
     }
     const sortRow =
@@ -417,7 +681,10 @@
   }
 
   function renderRouteTab() {
-    const favIds = Object.keys(state.favorites).filter((id) => state.favorites[id] && !state.completed[id]);
+    // 통제 중으로 표시한 시설은 추천 동선 계산에서 제외한다
+    const favIds = Object.keys(state.favorites).filter(
+      (id) => state.favorites[id] && !state.completed[id] && !state.controlled[id]
+    );
     const items = getFacilities().filter((f) => favIds.indexOf(f.id) !== -1);
     if (items.length === 0) {
       dom.sheetContent.innerHTML =
@@ -490,12 +757,38 @@
   // ---------------------------------------------------------------------
   // 시설 상세 바텀시트
   // ---------------------------------------------------------------------
+  function kidHeightStatusHtml(f) {
+    if (f.minimumHeight == null) {
+      return '<span class="disney-detail-chip">키 제한: 확인 필요</span>';
+    }
+    if (!state.kidsProfile.length) {
+      return '<span class="disney-detail-chip">키 제한 ' + f.minimumHeight + "cm~ · 프로필에 아이 키를 등록해보세요</span>";
+    }
+    return state.kidsProfile
+      .map((kid) => {
+        const ok = kid.heightCm >= f.minimumHeight;
+        return (
+          '<span class="disney-detail-chip ' +
+          (ok ? "kid-ok" : "kid-no") +
+          '">' +
+          escapeHtml(kid.name) +
+          "(" +
+          kid.heightCm +
+          "cm) " +
+          (ok ? "이용 가능" : "키 제한으로 불가") +
+          "</span>"
+        );
+      })
+      .join("");
+  }
+
   function openDetail(id) {
     const f = findFacility(id);
     if (!f) return;
     focusFacility(id);
     const isFav = !!state.favorites[id];
     const isDone = !!state.completed[id];
+    const isControlled = !!state.controlled[id];
     const memoText = state.memos[id] || "";
     const dist = haversineMeters(getOrigin(), f.coords);
 
@@ -510,6 +803,7 @@
       escapeHtml(f.name) +
       (isDone ? '<span class="disney-done-badge">완료</span>' : "") +
       (f.approximate ? '<span class="disney-approx-badge">근사 위치</span>' : "") +
+      (isControlled ? '<span class="disney-controlled-badge">통제중</span>' : "") +
       "</p>" +
       '<p class="disney-detail-area">' +
       escapeHtml(f.area) +
@@ -534,6 +828,7 @@
       (f.recommendedTime ? '<span class="disney-detail-chip">⏱ ' + escapeHtml(f.recommendedTime) + "</span>" : "") +
       (f.priceRange ? '<span class="disney-detail-chip">💴 ' + escapeHtml(f.priceRange) + "</span>" : "") +
       (f.rating ? '<span class="disney-detail-chip">' + "★".repeat(f.rating) + "</span>" : "") +
+      (f.category === "attraction" ? kidHeightStatusHtml(f) : "") +
       "</div>" +
       (f.highlights && f.highlights.length
         ? '<div class="disney-detail-highlights">' +
@@ -555,6 +850,13 @@
       (isDone ? "✓ 완료됨" : "체크 완료") +
       "</button>" +
       "</div>" +
+      '<button type="button" class="disney-controlled-toggle' +
+      (isControlled ? " active" : "") +
+      '" data-action="toggle-controlled" data-facility-id="' +
+      f.id +
+      '">🚧 ' +
+      (isControlled ? "통제 해제하기" : "이 장소 통제 중으로 표시") +
+      "</button>" +
       '<div class="disney-detail-memo"><span class="disney-section-label">📝 메모</span>' +
       '<textarea data-facility-id="' +
       f.id +
@@ -578,7 +880,7 @@
   }
 
   // ---------------------------------------------------------------------
-  // 즐겨찾기 / 완료 체크
+  // 즐겨찾기 / 완료 체크 / 통제구역
   // ---------------------------------------------------------------------
   function toggleFavorite(id) {
     state.favorites[id] = !state.favorites[id];
@@ -590,6 +892,14 @@
   function toggleCompleted(id) {
     state.completed[id] = !state.completed[id];
     persistCompleted();
+    renderCategoryMarkers();
+    renderFavoriteMarkers();
+    refreshAfterStateChange();
+  }
+  function toggleControlled(id) {
+    state.controlled[id] = !state.controlled[id];
+    persistControlled();
+    showToast(state.controlled[id] ? "이 장소를 통제 중으로 표시했어요 · 추천 동선에서 제외돼요" : "통제 해제했어요");
     renderCategoryMarkers();
     renderFavoriteMarkers();
     refreshAfterStateChange();
@@ -621,6 +931,8 @@
     const f = findFacility(id);
     if (!f) return;
     state.routeTargetId = id;
+    state.watchMode = "navigating";
+    applyWatchFrequency();
     enterNavigationMode();
     drawRoute();
   }
@@ -642,10 +954,20 @@
     renderSheetContent();
   }
 
+  // 직선 경로만 그릴 수 있으므로 "경로 이탈"이라는 개념 자체가 없다(경로는
+  // 항상 현재 위치에서 새로 그어진다). 대신 마지막으로 그린 지점에서
+  // RECALC_THRESHOLD_M 이상 움직였을 때만 "다시 계산 중" 표시와 함께
+  // 갱신해서, 사소한 GPS 흔들림마다 화면이 계속 깜빡이지 않게 한다.
+  const RECALC_THRESHOLD_M = 30;
+
   function drawRoute() {
     const f = findFacility(state.routeTargetId);
     if (!f) return;
     const origin = getOrigin();
+
+    const movedFar = state.lastRouteOrigin && haversineMeters(state.lastRouteOrigin, origin) >= RECALC_THRESHOLD_M;
+    if (movedFar) showToast("경로를 다시 계산하고 있습니다");
+    state.lastRouteOrigin = origin;
 
     if (state.routeLine) state.map.removeLayer(state.routeLine);
     state.routeLine = L.polyline([origin, f.coords], {
@@ -697,7 +1019,7 @@
 
   // 경로에서 크게 벗어나지 않는(출발지 또는 목적지에서 400m 이내) 화장실만 지도에 얹는다.
   function toggleRouteRestrooms(show) {
-    state.routeRestroomMarkers.forEach((m) => state.map.removeLayer(m));
+    state.routeRestroomLayer.clearLayers();
     state.routeRestroomMarkers = [];
     if (!show) return;
 
@@ -713,9 +1035,7 @@
       return;
     }
     nearby.forEach((r) => {
-      const marker = buildFacilityMarker(r);
-      marker.addTo(state.map);
-      state.routeRestroomMarkers.push(marker);
+      buildFacilityMarker(r).addTo(state.routeRestroomLayer);
     });
     showToast(nearby.length + "곳의 화장실을 경로 주변에 표시했어요");
   }
@@ -723,6 +1043,9 @@
   function closeRoute() {
     state.routeTargetId = null;
     state.showRestroomsAlongRoute = false;
+    state.lastRouteOrigin = null;
+    state.watchMode = "idle";
+    applyWatchFrequency();
     toggleRouteRestrooms(false);
     if (state.routeLine) {
       state.map.removeLayer(state.routeLine);
@@ -751,14 +1074,18 @@
   // ---------------------------------------------------------------------
   function openRestroomFinder() {
     const origin = getOrigin();
-    const restrooms = getFacilities().filter((f) => f.category === "restroom");
+    const restrooms = getFacilities().filter((f) => f.category === "restroom" && !state.controlled[f.id]);
 
     if (restrooms.length === 0) {
       dom.restroomSheet.innerHTML =
         '<div class="disney-restroom-empty">' +
         '<p class="disney-detail-name">🚻 화장실 정보 준비 중</p>' +
-        '<p class="disney-detail-desc">화장실 위치는 구글맵이나 공식 사이트에서 개별 검증할 수 있는 출처가 없어 이 지도에는 아직 표시하지 않고 있어요. 정확한 위치는 파크 내 안내도나 디즈니 공식 앱에서 확인해주세요.</p>' +
-        '<a class="btn btn-primary" href="https://www.tokyodisneyresort.jp/tdl/" target="_blank" rel="noopener">디즈니 공식 사이트 열기</a>' +
+        '<p class="disney-detail-desc">' +
+        getParkData().name +
+        "의 화장실 위치는 구글맵이나 공식 사이트에서 개별 검증할 수 있는 출처가 없어 이 지도에는 아직 표시하지 않고 있어요. 정확한 위치는 파크 내 안내도나 디즈니 공식 앱에서 확인해주세요.</p>" +
+        '<a class="btn btn-primary" href="https://www.tokyodisneyresort.jp/' +
+        (state.currentPark === "tds" ? "tds" : "tdl") +
+        '/" target="_blank" rel="noopener">디즈니 공식 사이트 열기</a>' +
         "</div>";
       dom.restroomOverlay.classList.add("show");
       return;
@@ -822,13 +1149,33 @@
   }
 
   // ---------------------------------------------------------------------
-  // 현재 위치 — 실시간 추적 + 경로 갱신 + 권한 거부 시 대안 제공
+  // 현재 위치 — 실시간 추적 + GPS 안정화 + 파크 밖 판정 + 배터리 절약
   // ---------------------------------------------------------------------
+  const LOW_ACCURACY_M = 50;
+  const REJECT_ACCURACY_M = 100; // 이보다 정확도가 낮은(오차가 큰) 픽스는 아예 반영하지 않음
+  const MAX_JUMP_MPS = 8; // 사람이 걷는 속도를 크게 초과하는 순간 이동은 GPS 튐으로 간주해 무시
+  const JUMP_REJECT_LIMIT = 3; // 이 횟수만큼 연속으로 거부되면 실제 이동으로 보고 받아들임(영구 잠금 방지)
+  const OUTSIDE_DEBOUNCE_COUNT = 3; // 연속 3회 이상 파크 밖으로 감지될 때만 "밖" 상태로 전환
+
+  function applyWatchFrequency() {
+    if (state.watchId == null) return;
+    // 브라우저 Geolocation API는 폴링 주기를 직접 지정할 수 없어(구현체마다 다름),
+    // maximumAge/enableHighAccuracy 조합으로 사실상의 빈도를 조절한다 —
+    // 길찾기 중엔 항상 최신 고정밀 픽스를, 평상시엔 약간 오래된 값도 허용해 배터리를 아낀다.
+    navigator.geolocation.clearWatch(state.watchId);
+    state.watchId = navigator.geolocation.watchPosition(handlePositionUpdate, handlePositionError, {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: state.watchMode === "navigating" ? 2000 : 8000,
+    });
+  }
+
   function toggleGeolocation() {
     if (state.watchId != null) {
       navigator.geolocation.clearWatch(state.watchId);
       state.watchId = null;
       state.userLocation = null;
+      state.recentFixes = [];
       state.userMarkerLayer.clearLayers();
       dom.locateBtn.classList.remove("locate-active");
       if (state.routeTargetId) drawRoute();
@@ -842,32 +1189,137 @@
     }
     dom.locateBtn.classList.add("locate-active");
     maybeRequestOrientationPermission();
+    state.watchMode = state.navigationMode ? "navigating" : "idle";
     let firstFix = true;
     state.watchId = navigator.geolocation.watchPosition(
       (pos) => {
-        hideLocationFallback();
-        state.userLocation = [pos.coords.latitude, pos.coords.longitude];
-        renderUserLocationMarker(state.userLocation, pos.coords.accuracy || 30);
-        if (firstFix) {
+        handlePositionUpdate(pos);
+        if (firstFix && state.userLocation) {
           state.map.setView(state.userLocation, 17);
           firstFix = false;
         }
-        if (state.routeTargetId) drawRoute();
-        refreshDistanceDependentUI();
       },
-      (err) => {
-        dom.locateBtn.classList.remove("locate-active");
-        state.watchId = null;
-        const messages = {
-          1: "위치 권한이 꺼져 있어요.",
-          2: "현재 위치를 확인할 수 없어요.",
-          3: "위치 확인이 너무 오래 걸려요.",
-        };
-        showToast(messages[err.code] || "위치 확인에 실패했어요");
-        showLocationFallback();
-      },
+      handlePositionError,
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
     );
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+  }
+
+  // 화면이 백그라운드로 가면 위치 갱신을 잠시 멈추고, 돌아오면 다시 켠다(배터리 절약).
+  function handleVisibilityChange() {
+    if (state.watchId == null) return;
+    if (document.hidden) {
+      navigator.geolocation.clearWatch(state.watchId);
+      state.watchId = null;
+    } else {
+      applyWatchFrequency();
+    }
+  }
+
+  function handlePositionError(err) {
+    dom.locateBtn.classList.remove("locate-active");
+    state.watchId = null;
+    const messages = {
+      1: "위치 권한이 꺼져 있어요.",
+      2: "현재 위치를 확인할 수 없어요.",
+      3: "위치 확인이 너무 오래 걸려요.",
+    };
+    showToast(messages[err.code] || "위치 확인에 실패했어요");
+    showLocationFallback();
+  }
+
+  function handlePositionUpdate(pos) {
+    hideLocationFallback();
+    const accuracy = pos.coords.accuracy || 999;
+    const fix = [pos.coords.latitude, pos.coords.longitude];
+
+    // 정확도가 지나치게 낮은 픽스는 경로/거리 계산에 아예 반영하지 않는다
+    if (accuracy > REJECT_ACCURACY_M) {
+      showLowAccuracyBanner(accuracy);
+      return;
+    }
+    // 도보로는 나올 수 없는 순간 이동(직전 픽스 대비)은 GPS 튐으로 보고 무시.
+    // 단, 튐이 계속 같은 방향으로 반복되면(예: 택시로 파크를 빠르게 빠져나간 경우,
+    // 또는 GPS가 건물/터널에서 벗어나 위치가 실제로 크게 바뀐 경우) 그건 튐이
+    // 아니라 실제 이동이므로, 연속 거부 횟수가 임계치를 넘으면 새 위치를 받아들여
+    // 이전의 낡은 위치에 영원히 묶이는 것을 막는다.
+    if (state.userLocation) {
+      const jump = haversineMeters(state.userLocation, fix);
+      const seconds = Math.max(1, (pos.timestamp - (state.lastFixTimestamp || pos.timestamp)) / 1000);
+      if (jump / seconds > MAX_JUMP_MPS) {
+        state.rejectedJumpStreak += 1;
+        if (state.rejectedJumpStreak < JUMP_REJECT_LIMIT) return;
+        state.recentFixes = []; // 스무딩 큐를 비워 새 위치로 빠르게 수렴시킴
+      }
+    }
+    state.rejectedJumpStreak = 0;
+    state.lastFixTimestamp = pos.timestamp;
+
+    if (accuracy > LOW_ACCURACY_M) {
+      showLowAccuracyBanner(accuracy);
+    } else {
+      hideLowAccuracyBanner();
+    }
+
+    // 최근 픽스 여러 개를 평균 내어 완만화(단순 이동평균)
+    state.recentFixes.push(fix);
+    if (state.recentFixes.length > 4) state.recentFixes.shift();
+    const avgLat = state.recentFixes.reduce((s, p) => s + p[0], 0) / state.recentFixes.length;
+    const avgLng = state.recentFixes.reduce((s, p) => s + p[1], 0) / state.recentFixes.length;
+    state.userLocation = [avgLat, avgLng];
+
+    renderUserLocationMarker(state.userLocation, accuracy);
+    updateInsideParkStatus(state.userLocation);
+
+    if (state.routeTargetId) drawRoute();
+    refreshDistanceDependentUI();
+  }
+
+  // 파크 밖으로 잠깐 튀는 오탐을 막기 위해, 연속 N회 이상 밖으로 감지될
+  // 때만 실제로 "밖" 상태로 전환한다.
+  function updateInsideParkStatus(latlng) {
+    const bounds = computeParkBounds(state.currentPark);
+    const inside = bounds.contains(latlng);
+    if (inside) {
+      state.outsideStreak = 0;
+      if (!state.isInsidePark) {
+        state.isInsidePark = true;
+        hideOutsideParkBanner();
+      }
+      return;
+    }
+    state.outsideStreak += 1;
+    if (state.outsideStreak >= OUTSIDE_DEBOUNCE_COUNT && state.isInsidePark) {
+      state.isInsidePark = false;
+      showOutsideParkBanner();
+    }
+  }
+
+  function showOutsideParkBanner() {
+    dom.outsideParkBanner.hidden = false;
+    dom.outsideParkBanner.innerHTML =
+      '<span>현재 파크 외부에 있는 것으로 보여요</span>' +
+      '<button type="button" class="btn btn-outline" id="disneyUseEntranceBtn">파크 입구를 출발점으로 사용</button>';
+    document.getElementById("disneyUseEntranceBtn").addEventListener("click", () => {
+      state.userLocation = getParkData().coords;
+      hideOutsideParkBanner();
+      if (state.routeTargetId) drawRoute();
+      refreshDistanceDependentUI();
+    });
+    // 지도 중심은 파크 밖 실제 GPS로 옮기지 않고 그대로 파크 전체 보기를 유지한다
+  }
+  function hideOutsideParkBanner() {
+    dom.outsideParkBanner.hidden = true;
+    dom.outsideParkBanner.innerHTML = "";
+  }
+
+  function showLowAccuracyBanner(accuracy) {
+    dom.lowAccuracyBanner.hidden = false;
+    dom.lowAccuracyBanner.textContent = "📡 GPS 정확도가 낮습니다 (오차 약 " + Math.round(accuracy) + "m)";
+  }
+  function hideLowAccuracyBanner() {
+    dom.lowAccuracyBanner.hidden = true;
   }
 
   // 위치 권한이 없거나 실패했을 때도 화면이 멈추지 않도록 항상 3가지 대안을 준다.
@@ -881,7 +1333,7 @@
       '<button type="button" class="btn btn-primary" id="fallbackRetryBtn">위치 권한 다시 요청</button>' +
       "</div>";
     document.getElementById("fallbackEntranceBtn").addEventListener("click", () => {
-      state.userLocation = DISNEY_DATA.disneyland.coords;
+      state.userLocation = getParkData().coords;
       hideLocationFallback();
       showToast("파크 입구(중앙) 기준으로 안내할게요");
       if (state.routeTargetId) drawRoute();
@@ -972,6 +1424,7 @@
     } else {
       dom.sheet.style.height = px + "px";
     }
+    handleViewportChange(); // 시트 높이가 바뀌면 지도 크기/최소줌/중심도 다시 맞춘다
   }
 
   function nearestSheetState(px, available) {
@@ -1030,11 +1483,120 @@
   }
 
   // ---------------------------------------------------------------------
+  // Quick Actions 더보기 메뉴
+  // ---------------------------------------------------------------------
+  function toggleMoreMenu() {
+    state.moreMenuOpen = !state.moreMenuOpen;
+    dom.moreMenu.hidden = !state.moreMenuOpen;
+    if (!state.moreMenuOpen) return;
+    dom.moreMenu.innerHTML =
+      '<button type="button" data-more-action="fit">🗺️ 파크 전체 보기</button>' +
+      '<button type="button" data-more-action="food">🍴 가장 가까운 음식점</button>' +
+      '<button type="button" data-more-action="rest">🪑 가장 가까운 휴식 장소</button>' +
+      '<button type="button" data-more-action="north">🧭 지도 북쪽 정렬</button>' +
+      (state.routeTargetId ? '<button type="button" data-more-action="endroute">⏹️ 경로 종료</button>' : "");
+  }
+  function closeMoreMenu() {
+    state.moreMenuOpen = false;
+    dom.moreMenu.hidden = true;
+  }
+
+  function handleMoreAction(action) {
+    if (action === "fit") {
+      state.map.fitBounds(computeParkBounds(state.currentPark), { padding: [12, 12] });
+    } else if (action === "food") {
+      routeToNearestOfCategory("restaurant");
+    } else if (action === "rest") {
+      showToast("휴식 장소 데이터는 아직 준비 중이에요");
+    } else if (action === "north") {
+      state.map.fitBounds(computeParkBounds(state.currentPark), { padding: [12, 12] }); // 지도를 회전시키지 않으므로 사실상 항상 북쪽 기준 — 전체 보기로 복귀
+    } else if (action === "endroute") {
+      closeRoute();
+    }
+    closeMoreMenu();
+  }
+
+  function routeToNearestOfCategory(category) {
+    const origin = getOrigin();
+    const candidates = getFacilities().filter((f) => f.category === category && !state.controlled[f.id]);
+    if (candidates.length === 0) {
+      showToast("조건에 맞는 시설이 없어요");
+      return;
+    }
+    let best = candidates[0];
+    let bestDist = haversineMeters(origin, best.coords);
+    candidates.forEach((f) => {
+      const d = haversineMeters(origin, f.coords);
+      if (d < bestDist) {
+        bestDist = d;
+        best = f;
+      }
+    });
+    routeTo(best.id);
+  }
+
+  // ---------------------------------------------------------------------
+  // 아이 키 프로필
+  // ---------------------------------------------------------------------
+  function openKidsProfile() {
+    renderKidsProfileSheet();
+    dom.kidsProfileOverlay.classList.add("show");
+  }
+  function closeKidsProfile() {
+    dom.kidsProfileOverlay.classList.remove("show");
+  }
+  function renderKidsProfileSheet() {
+    dom.kidsProfileSheet.innerHTML =
+      '<p class="disney-detail-name">👶 아이 키 프로필</p>' +
+      '<p class="disney-detail-desc">등록해두면 어트랙션 상세에서 탑승 가능 여부를 바로 확인할 수 있어요(키 제한 정보가 공식 확인된 어트랙션에 한해서요).</p>' +
+      '<div id="disneyKidsProfileList">' +
+      state.kidsProfile
+        .map(
+          (kid, idx) =>
+            '<div class="disney-kid-row">' +
+            '<span>' + escapeHtml(kid.name) + " · " + kid.heightCm + "cm</span>" +
+            '<button type="button" data-remove-kid="' + idx + '" aria-label="삭제">✕</button>' +
+            "</div>"
+        )
+        .join("") +
+      "</div>" +
+      '<div class="disney-kid-form">' +
+      '<input type="text" id="disneyKidNameInput" placeholder="이름(예: 담이)" />' +
+      '<input type="number" id="disneyKidHeightInput" placeholder="키(cm)" inputmode="numeric" />' +
+      '<button type="button" class="btn btn-primary" id="disneyAddKidBtn">추가</button>' +
+      "</div>";
+
+    dom.kidsProfileSheet.querySelectorAll("[data-remove-kid]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        state.kidsProfile.splice(Number(btn.dataset.removeKid), 1);
+        persistKidsProfile();
+        renderKidsProfileSheet();
+      });
+    });
+    document.getElementById("disneyAddKidBtn").addEventListener("click", () => {
+      const name = document.getElementById("disneyKidNameInput").value.trim();
+      const height = parseInt(document.getElementById("disneyKidHeightInput").value, 10);
+      if (!name || !height) {
+        showToast("이름과 키를 입력해주세요");
+        return;
+      }
+      state.kidsProfile.push({ name: name, heightCm: height });
+      persistKidsProfile();
+      renderKidsProfileSheet();
+    });
+  }
+
+  // ---------------------------------------------------------------------
   // Events
   // ---------------------------------------------------------------------
   function bindEvents() {
     dom.searchInput.addEventListener("input", handleSearchInput);
     bindSheetDrag();
+
+    dom.parkSwitcher.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-park]");
+      if (btn) switchPark(btn.dataset.park);
+    });
 
     dom.categoryBar.addEventListener("click", (e) => {
       const chip = e.target.closest("[data-category]");
@@ -1042,6 +1604,12 @@
     });
 
     dom.restroomFab.addEventListener("click", openRestroomFinder);
+    dom.moreBtn.addEventListener("click", toggleMoreMenu);
+    dom.moreMenu.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-more-action]");
+      if (btn) handleMoreAction(btn.dataset.moreAction);
+    });
+    dom.kidsProfileBtn.addEventListener("click", openKidsProfile);
 
     dom.sheetTabs.addEventListener("click", (e) => {
       const btn = e.target.closest("[data-tab]");
@@ -1072,6 +1640,12 @@
         return;
       }
 
+      const controlledBtn = e.target.closest('[data-action="toggle-controlled"]');
+      if (controlledBtn) {
+        toggleControlled(controlledBtn.dataset.facilityId);
+        return;
+      }
+
       const routeBtn = e.target.closest('[data-action="route-to"]');
       if (routeBtn) {
         routeTo(routeBtn.dataset.facilityId);
@@ -1086,6 +1660,14 @@
       if (e.target === dom.restroomOverlay) {
         closeRestroomFinder();
         return;
+      }
+      if (e.target === dom.kidsProfileOverlay) {
+        closeKidsProfile();
+        return;
+      }
+
+      if (state.moreMenuOpen && !e.target.closest("#disneyMoreMenu") && !e.target.closest("#disneyMoreBtn")) {
+        closeMoreMenu();
       }
 
       const row = e.target.closest("[data-facility-id]");

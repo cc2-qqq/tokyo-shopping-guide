@@ -94,6 +94,33 @@ body.disney-page #app {
 }
 
 /* ---------------------------------------------------------------------
+   파크 전환 (디즈니랜드 / 디즈니씨)
+   --------------------------------------------------------------------- */
+.disney-park-switcher {
+  flex-shrink: 0;
+  display: flex;
+  gap: 8px;
+  padding: 0 12px 10px;
+  background: var(--color-card);
+}
+.disney-park-tab {
+  flex: 1;
+  border: none;
+  background: var(--color-gray-bg);
+  color: var(--color-text-secondary);
+  font-size: 13.5px;
+  font-weight: 800;
+  padding: 10px 0;
+  min-height: 40px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+}
+.disney-park-tab.active {
+  background: var(--color-blue);
+  color: #fff;
+}
+
+/* ---------------------------------------------------------------------
    카테고리 필터 칩
    --------------------------------------------------------------------- */
 .disney-category-bar {
@@ -151,6 +178,11 @@ body.disney-page #app {
 .disney-map {
   position: absolute;
   inset: 0;
+  /* Leaflet 내부 pane/컨트롤의 z-index(최대 1000)가 부모 스태킹 컨텍스트가
+     없으면 형제 오버레이(퀵액션 버튼, 배너 등)보다 위로 새어나가 그 위를
+     덮어버린다 — 지도 컨테이너 자체에 스태킹 컨텍스트를 만들어 내부 값들을
+     이 안에 가둔다. */
+  z-index: 0;
 }
 
 .disney-marker {
@@ -197,6 +229,155 @@ body.disney-page #app {
 }
 .disney-marker.large span {
   font-size: 22px;
+}
+.disney-marker.controlled {
+  background: var(--color-orange-dark, #c2650a);
+  opacity: 0.9;
+}
+
+/* ---------------------------------------------------------------------
+   상태 배너 (파크 외부 / GPS 정확도 낮음 / 타일 로드 실패)
+   --------------------------------------------------------------------- */
+.disney-banner-stack {
+  position: absolute;
+  left: 12px;
+  right: 64px; /* 우측 상단 퀵액션 버튼 열과 겹치지 않도록 여유를 둠 */
+  top: 12px;
+  z-index: 17;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+.disney-banner {
+  pointer-events: auto;
+  background: var(--color-card);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: 10px 14px;
+  font-size: 12.5px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.disney-banner[hidden] {
+  display: none;
+}
+.disney-banner-outside {
+  background: #fff3e0;
+  color: var(--color-orange-dark, #c2650a);
+  flex-wrap: wrap;
+}
+.disney-banner-outside .btn {
+  min-height: 36px;
+  font-size: 12px;
+  padding: 0 12px;
+  flex-shrink: 0;
+}
+.disney-banner-warning {
+  background: #fff8e1;
+  color: #8a6d00;
+}
+
+/* ---------------------------------------------------------------------
+   우측 상단 보조 액션 (아이 키 프로필 / 공식 지도 / 더보기)
+   --------------------------------------------------------------------- */
+.disney-quick-actions {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  z-index: 19;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.disney-quick-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: var(--color-card);
+  box-shadow: var(--shadow-lg);
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  text-decoration: none;
+  color: var(--color-text);
+}
+.disney-quick-btn:active {
+  transform: scale(0.94);
+}
+.disney-more-menu {
+  position: absolute;
+  right: 12px;
+  top: 148px;
+  z-index: 25;
+  background: var(--color-card);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  min-width: 190px;
+}
+.disney-more-menu[hidden] {
+  display: none;
+}
+.disney-more-menu button {
+  display: block;
+  width: 100%;
+  border: none;
+  background: none;
+  text-align: left;
+  padding: 13px 16px;
+  min-height: 44px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-text);
+  cursor: pointer;
+  border-bottom: 1px solid var(--color-divider);
+  box-sizing: border-box;
+}
+.disney-more-menu button:last-child {
+  border-bottom: none;
+}
+.disney-more-menu button:active {
+  background: var(--color-gray-bg);
+}
+
+/* 통제구역(공사/행사로 인한 폐쇄) 표시 */
+.disney-controlled-badge {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--color-orange-dark, #c2650a);
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  vertical-align: middle;
+}
+.disney-controlled-toggle {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  border: 1px dashed var(--color-gray-light);
+  background: none;
+  color: var(--color-text-secondary);
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 10px;
+  min-height: 40px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.disney-controlled-toggle.active {
+  border-style: solid;
+  border-color: var(--color-orange-dark, #c2650a);
+  color: var(--color-orange-dark, #c2650a);
+  background: rgba(255, 149, 0, 0.1);
 }
 
 /* Leaflet.markercluster 기본 배지(연겨자색)를 앱 톤에 맞게 재정의 */
@@ -708,8 +889,52 @@ body.disney-page #app {
 }
 
 /* ---------------------------------------------------------------------
-   현재 위치 방향 화살표(있을 때만)
+   현재 위치 마커 (점 + 펄스 애니메이션 + 방향 화살표)
    --------------------------------------------------------------------- */
+.user-location-wrap {
+  position: relative;
+  width: 0;
+  height: 0;
+}
+.user-location-dot {
+  position: absolute;
+  left: -7px;
+  top: -7px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-blue);
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  z-index: 2;
+}
+.user-location-pulse {
+  position: absolute;
+  left: -16px;
+  top: -16px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(0, 122, 255, 0.3);
+  animation: disney-pulse 2s ease-out infinite;
+  z-index: 1;
+}
+@keyframes disney-pulse {
+  0% {
+    transform: scale(0.4);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .user-location-pulse {
+    animation: none;
+    opacity: 0.35;
+  }
+}
 .user-location-heading {
   position: absolute;
   left: 0;
@@ -721,6 +946,62 @@ body.disney-page #app {
   font-weight: 900;
   z-index: 4;
   line-height: 1;
+}
+
+/* ---------------------------------------------------------------------
+   아이 키 프로필
+   --------------------------------------------------------------------- */
+.disney-kid-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-divider);
+  font-size: 14px;
+  font-weight: 600;
+}
+.disney-kid-row button {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: var(--color-gray-bg);
+  border-radius: 50%;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+.disney-kid-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.disney-kid-form input {
+  min-width: 0;
+  flex: 1;
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-size: 13.5px;
+  font-family: inherit;
+  background: var(--color-bg);
+  color: var(--color-text);
+  box-sizing: border-box;
+  min-height: 44px;
+}
+.disney-kid-form input#disneyKidHeightInput {
+  flex: 0 0 90px;
+}
+.disney-kid-form .btn {
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 0 16px;
+}
+.disney-detail-chip.kid-ok {
+  color: #fff;
+  background: var(--color-green);
+}
+.disney-detail-chip.kid-no {
+  color: #fff;
+  background: var(--color-red);
 }
 
 /* ---------------------------------------------------------------------
@@ -738,5 +1019,17 @@ body.disney-page #app {
   .disney-restroom-fab {
     font-size: 12.5px;
     padding: 10px 14px;
+  }
+  .disney-park-tab {
+    font-size: 12.5px;
+  }
+  .disney-quick-btn {
+    width: 38px;
+    height: 38px;
+    font-size: 15px;
+  }
+  .disney-more-menu {
+    top: 132px;
+    min-width: 160px;
   }
 }
